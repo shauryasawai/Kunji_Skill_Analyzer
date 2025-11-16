@@ -146,39 +146,32 @@
                 <!-- Candidate Matching Section -->
 <div class="card mb-5" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">
   <div class="card-body p-4">
-    <h4 class="text-white mb-3">🎯 Match Candidates from Your Database</h4>
-    <p class="mb-4">Find candidates from your Google Sheet database who match these skill requirements</p>
-    {% if google_sheets %}
-      <form method="POST" action="{% url 'match_candidates' jd.pk %}">
-        {% csrf_token %}
-        <div class="row">
-          <div class="col-md-7">
-            <label class="text-white mb-2">Select Google Sheet Database:</label>
-            {{ match_form.google_sheet }}
-          </div>
-          <div class="col-md-3">
-            <label class="text-white mb-2">Min Match %:</label>
-            {{ match_form.min_match_percentage }}
-          </div>
-          <div class="col-md-2 d-flex align-items-end">
-            <button type="submit" class="btn btn-light w-100">
-              🔍 Find Matches
-            </button>
-          </div>
+    <h4 class="text-white mb-3">🎯 Match Candidates from Database</h4>
+    <p class="mb-4">Find candidates who match these skill requirements</p>
+    
+    <form method="POST" action="{% url 'match_candidates' jd.pk %}">
+      {% csrf_token %}
+      <div class="row">
+        <div class="col-md-8">
+          <label class="text-white mb-2">Minimum Match Percentage:</label>
+          {{ match_form.min_match_percentage }}
         </div>
-      </form>
-    {% else %}
-      <div class="text-center">
-        <p class="text-white mb-3">No Google Sheet databases added yet</p>
-        <a href="{% url 'add_google_sheet' %}" class="btn btn-light">
-          📤 Add Google Sheet Database
-        </a>
+        <div class="col-md-4 d-flex align-items-end">
+          <button type="submit" class="btn btn-light w-100">
+            🔍 Find Matches
+          </button>
+        </div>
       </div>
-    {% endif %}
+      {% if total_candidates %}
+      <div class="mt-3">
+        <small class="text-white">
+          <i class="fas fa-database"></i> Total candidates available: <strong>{{ total_candidates }}</strong>
+        </small>
+      </div>
+      {% endif %}
+    </form>
   </div>
-</div>
-
-                
+</div>          
                 <!-- Job Summary Box -->
                 <div class="alert alert-info">
                     <h5>💡 Recruitment Summary</h5>

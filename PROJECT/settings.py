@@ -211,6 +211,12 @@ CSRF_FAILURE_VIEW = 'django.views.csrf.csrf_failure'
 CSRF_USE_SESSIONS = False
 CSRF_COOKIE_NAME = 'csrftoken'
 
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+CANDIDATES_API_URL = os.getenv("CANDIDATES_API_URL", "")
+
 # # Logging Configuration
 # LOGGING = {
 #     'version': 1,

@@ -7,6 +7,7 @@ from django.conf import settings
 from PyPDF2 import PdfReader
 from docx import Document
 import os
+import requests
 
 def generate_linkedin_search_strings(skills, role_title, experience_level):
     '''Generate optimized LinkedIn Recruiter boolean search strings'''
@@ -291,179 +292,275 @@ def cleanup_old_matched_files(days=1):
     
     if deleted_count > 0:
         print(f"✅ Cleanup complete: {deleted_count} old files deleted")
-        
 
-def fetch_google_sheet_data(sheet_id, credentials_path=None):
+
+def fetch_candidates_from_api(api_url=None, api_key=None, timeout=30):
     '''
-    Fetch candidate data from Google Sheets
+    Fetch candidate data from API with improved debugging
     '''
-    import gspread
-    from google.oauth2.service_account import Credentials
-    
     try:
-        if credentials_path is None:
-            credentials_path = settings.GOOGLE_SHEETS_CREDENTIALS  # this is a dict
+        # Use settings if not provided
+        if api_url is None:
+            api_url = getattr(settings, 'CANDIDATES_API_URL', None)
+        if api_key is None:
+            api_key = getattr(settings, 'CANDIDATES_API_KEY', None)
         
-        scopes = [
-            'https://www.googleapis.com/auth/spreadsheets.readonly',
-            'https://www.googleapis.com/auth/drive.readonly'
-        ]
+        if not api_url:
+            print("❌ Error: CANDIDATES_API_URL not configured in settings")
+            return pd.DataFrame()
         
-        # ✅ use from_service_account_info for dict
-        creds = Credentials.from_service_account_info(credentials_path, scopes=scopes)
-        client = gspread.authorize(creds)
+        # Prepare headers
+        headers = {
+            'Content-Type': 'application/json',
+        }
         
-        spreadsheet = client.open_by_key(sheet_id)
-        worksheet = spreadsheet.sheet1
+        # Add API key to headers if provided
+        if api_key:
+            headers['Authorization'] = f'Bearer {api_key}'
         
-        data = worksheet.get_all_records()
-        df = pd.DataFrame(data)
+        print(f"🔄 Fetching candidates from API: {api_url}")
         
-        print(f"✅ Successfully fetched {len(df)} rows from Google Sheet")
+        # Make API request
+        response = requests.get(api_url, headers=headers, timeout=timeout)
+        response.raise_for_status()
+        
+        # Parse JSON response
+        data = response.json()
+        
+        print(f"📦 API Response type: {type(data)}")
+        
+        # Handle different API response structures
+        if isinstance(data, dict):
+            print(f"📦 Response keys: {list(data.keys())}")
+            
+            # Check for columnar format FIRST (highest priority)
+            if 'cols' in data and 'data' in data:
+                # Handle columnar format (cols + data)
+                print(f"✅ Using columnar format (cols + data)")
+                df = pd.DataFrame(data['data'], columns=data['cols'])
+                print(f"✅ Successfully fetched {len(df)} candidates from API")
+                return normalize_candidate_dataframe(df)
+            elif 'cols' in data and 'rows' in data:
+                # Handle columnar format (cols + rows)
+                print(f"✅ Using columnar format (cols + rows)")
+                df = pd.DataFrame(data['rows'], columns=data['cols'])
+                print(f"✅ Successfully fetched {len(df)} candidates from API")
+                return normalize_candidate_dataframe(df)
+            # Check for common data wrapper keys
+            elif 'data' in data:
+                candidates = data['data']
+                print(f"✅ Using 'data' key from response")
+            elif 'candidates' in data:
+                candidates = data['candidates']
+                print(f"✅ Using 'candidates' key from response")
+            elif 'results' in data:
+                candidates = data['results']
+                print(f"✅ Using 'results' key from response")
+            else:
+                # Assume the entire dict is the data
+                candidates = data
+                print(f"⚠️ Using entire response as data")
+        elif isinstance(data, list):
+            candidates = data
+            print(f"✅ Response is a list with {len(data)} items")
+        else:
+            print(f"❌ Unexpected API response format: {type(data)}")
+            return pd.DataFrame()
+        
+        # Convert to DataFrame
+        if not candidates:
+            print("⚠️ No candidates found in API response")
+            return pd.DataFrame()
+        
+        # If candidates is not a list, try to handle it
+        if not isinstance(candidates, list):
+            print(f"⚠️ Candidates is not a list, type: {type(candidates)}")
+            return pd.DataFrame()
+        
+        print(f"📊 Creating DataFrame from {len(candidates)} candidates")
+        df = pd.DataFrame(candidates)
+        
+        # Normalize column names
+        df = normalize_candidate_dataframe(df)
+        
+        print(f"✅ Successfully fetched {len(df)} candidates from API")
         return df
     
+    except requests.exceptions.Timeout:
+        print(f"❌ API request timed out after {timeout} seconds")
+        return pd.DataFrame()
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Error fetching candidates from API: {e}")
+        return pd.DataFrame()
+    except json.JSONDecodeError as e:
+        print(f"❌ Error parsing API response JSON: {e}")
+        print(f"❌ Response content (first 500 chars): {response.text[:500]}")
+        return pd.DataFrame()
     except Exception as e:
-        print(f"❌ Error fetching Google Sheet: {e}")
+        print(f"❌ Unexpected error fetching candidates: {e}")
+        import traceback
+        traceback.print_exc()
         return pd.DataFrame()
 
-
-
-def match_candidates_from_google_sheet(sheet_id, required_skills, min_match_percentage=50):
+def normalize_candidate_dataframe(df):
     '''
-    Match candidates from Google Sheets with job requirements
+    Normalize candidate DataFrame columns to standard format
+    
+    API fields mapping:
+    c_id -> id
+    c_name -> name
+    c_email -> email
+    c_phone -> contact
+    c_loc -> location
+    c_l_url -> linkedin
+    c_exp -> experience
+    c_skills -> skills
+    c_qualifications -> qualification
+    c_designation -> designation
+    c_cv_url -> cv_link
+    '''
+    
+    print(f"📋 Original columns: {df.columns.tolist()}")
+    
+    # Define column mapping
+    column_mapping = {
+        'c_id': 'id',
+        'c_name': 'name',
+        'c_email': 'email',
+        'c_phone': 'contact',
+        'c_loc': 'location',
+        'c_l_url': 'linkedin',
+        'c_exp': 'experience',
+        'c_skills': 'skills',
+        'c_qualifications': 'qualification',
+        'c_designation': 'designation',
+        'c_cv_url': 'cv_link'
+    }
+    
+    # Rename columns based on mapping (only if they exist)
+    rename_dict = {old: new for old, new in column_mapping.items() if old in df.columns}
+    if rename_dict:
+        df = df.rename(columns=rename_dict)
+        print(f"✅ Renamed columns: {rename_dict}")
+    
+    # Define standard columns we need
+    standard_columns = [
+        'id', 'name', 'email', 'contact', 'location', 
+        'linkedin', 'experience', 'skills', 'qualification', 
+        'designation', 'cv_link'
+    ]
+    
+    # Add missing standard columns with N/A
+    for col in standard_columns:
+        if col not in df.columns:
+            df[col] = 'N/A'
+            print(f"⚠️ Added missing column: {col}")
+    
+    # Add placeholder columns for compatibility
+    if 'current_company' not in df.columns:
+        df['current_company'] = 'N/A'
+    if 'status' not in df.columns:
+        df['status'] = 'Active'
+    
+    print(f"✅ Final columns: {df.columns.tolist()}")
+    
+    # Show sample data for debugging
+    if not df.empty:
+        print(f"📊 Sample data (first row):")
+        sample = df.iloc[0]
+        print(f"   - Name: {sample.get('name', 'N/A')}")
+        print(f"   - Email: {sample.get('email', 'N/A')}")
+        print(f"   - Skills: {sample.get('skills', 'N/A')[:100]}...")  # First 100 chars
+    
+    return df
+
+def match_candidates_with_jd(required_skills, min_match_percentage=50, api_url=None, api_key=None):
+    '''
+    Match candidates from API with job requirements
     
     Args:
-        sheet_id: Google Sheet ID
         required_skills: List of skills from JD
-        min_match_percentage: Minimum percentage of skills that must match
+        min_match_percentage: Minimum percentage of skills that must match (default 50%)
+        api_url: Optional API URL (uses settings if not provided)
+        api_key: Optional API key (uses settings if not provided)
     
     Returns:
         List of matched candidates with match scores
     '''
     try:
-        # Fetch data from Google Sheets
-        df = fetch_google_sheet_data(sheet_id)
+        # Fetch candidates from API
+        df = fetch_candidates_from_api(api_url, api_key)
         
         if df.empty:
-            print("No data found in Google Sheet")
+            print("❌ No candidates found from API")
             return []
         
-        # Normalize column names
-        df.columns = df.columns.str.strip()
-        
-        # Check if Skills column exists
-        if 'Skills' not in df.columns:
-            print("Error: 'Skills' column not found in Google Sheet")
+        # Check if skills column exists
+        if 'skills' not in df.columns:
+            print("❌ Error: 'skills' column not found in API response")
             print(f"Available columns: {df.columns.tolist()}")
             return []
         
+        print(f"📊 Processing {len(df)} candidates from API")
+        
         matched_candidates = []
         
         # Normalize required skills for comparison
-        required_skills_lower = [skill.lower().strip() for skill in required_skills]
+        required_skills_lower = [skill.lower().strip() for skill in required_skills if skill.strip()]
         
-        for idx, row in df.iterrows():
-            candidate_skills_str = str(row.get('Skills', ''))
-            
-            if not candidate_skills_str or candidate_skills_str == 'nan':
-                continue
-            
-            # Parse candidate skills (assume comma-separated)
-            candidate_skills = [s.lower().strip() for s in candidate_skills_str.split(',')]
-            
-            # Calculate skill matches
-            matched_skills = []
-            for req_skill in required_skills_lower:
-                for cand_skill in candidate_skills:
-                    # Check for exact match or partial match
-                    if req_skill in cand_skill or cand_skill in req_skill:
-                        matched_skills.append(req_skill)
-                        break
-            
-            # Calculate match percentage
-            match_percentage = (len(matched_skills) / len(required_skills_lower)) * 100 if required_skills_lower else 0
-            
-            # Only include candidates above threshold
-            if match_percentage >= min_match_percentage:
-                candidate_data = {
-                    'name': row.get('Candidate Name', 'N/A'),
-                    'email': row.get('Email', 'N/A'),
-                    'contact': row.get('Contact', 'N/A'),
-                    'location': row.get('Location', 'N/A'),
-                    'current_company': row.get('Current Company', 'N/A'),
-                    'designation': row.get('Designation', 'N/A'),
-                    'experience': row.get('Experience', 'N/A'),
-                    'linkedin': row.get('LinkedIn', 'N/A'),
-                    'qualification': row.get('Qualification', 'N/A'),
-                    'skills': row.get('Skills', 'N/A'),
-                    'cv_link': row.get('CV Link', 'N/A'),
-                    'status': row.get('Status', 'N/A'),
-                    'matched_skills': matched_skills,
-                    'match_percentage': round(match_percentage, 1),
-                    'matched_skills_count': len(matched_skills),
-                    'total_required_skills': len(required_skills_lower)
-                }
-                matched_candidates.append(candidate_data)
-        
-        # Sort by match percentage (highest first)
-        matched_candidates.sort(key=lambda x: x['match_percentage'], reverse=True)
-        
-        return matched_candidates
-    
-    except Exception as e:
-        print(f"Error matching candidates from Google Sheet: {e}")
-        return []
-    
-import pandas as pd
-from pathlib import Path
-from django.conf import settings  # only if running inside Django
-
-def match_candidates_with_jd(candidate_excel_path, required_skills, min_match_percentage=50):
-    '''
-    Match candidates from Excel database with job requirements
-    
-    Args:
-        candidate_excel_path: Path to candidate Excel file
-        required_skills: List of skills from JD
-        min_match_percentage: Minimum percentage of skills that must match (default 50%)
-    
-    Returns:
-        List of matched candidates with match scores
-    '''
-    try:
-        # Read candidate database
-        df = pd.read_excel(candidate_excel_path)
-        
-        # Normalize column names (remove spaces, lowercase)
-        df.columns = df.columns.str.strip()
-        
-        # Check if Skills column exists
-        if 'Skills' not in df.columns:
-            print("❌ Error: 'Skills' column not found in Excel")
+        if not required_skills_lower:
+            print("❌ No valid required skills provided")
             return []
         
-        matched_candidates = []
+        print(f"🎯 Required skills: {required_skills_lower}")
         
-        # Normalize required skills for comparison
-        required_skills_lower = [skill.lower().strip() for skill in required_skills]
-        
-        for _, row in df.iterrows():
-            candidate_skills_str = str(row.get('Skills', ''))
+        for idx, row in df.iterrows():
+            candidate_skills_str = str(row.get('skills', ''))
             
-            if not candidate_skills_str or candidate_skills_str.lower() == 'nan':
+            # Skip candidates with no skills
+            if not candidate_skills_str or candidate_skills_str.lower() in ['nan', 'none', '']:
                 continue
             
-            # Parse candidate skills (assume comma-separated)
-            candidate_skills = [s.lower().strip() for s in candidate_skills_str.split(',')]
+            # Parse candidate skills (comma, semicolon, or pipe separated)
+            candidate_skills_raw = re.split(r'[,;|]', candidate_skills_str)
+            candidate_skills = [s.lower().strip() for s in candidate_skills_raw if s.strip()]
             
-            # Calculate skill matches
+            if not candidate_skills:
+                continue
+            
+            # Calculate skill matches with flexible matching
             matched_skills = []
+            matched_skill_names = set()  # Track unique matches
+            
             for req_skill in required_skills_lower:
+                req_skill_words = set(req_skill.split())
+                
                 for cand_skill in candidate_skills:
-                    # Check for exact or partial match
-                    if req_skill in cand_skill or cand_skill in req_skill:
-                        matched_skills.append(req_skill)
+                    cand_skill_words = set(cand_skill.split())
+                    
+                    # Method 1: Exact match
+                    if req_skill == cand_skill:
+                        if req_skill not in matched_skill_names:
+                            matched_skills.append(req_skill)
+                            matched_skill_names.add(req_skill)
                         break
+                    
+                    # Method 2: Substring match (either direction)
+                    elif req_skill in cand_skill or cand_skill in req_skill:
+                        if req_skill not in matched_skill_names:
+                            matched_skills.append(req_skill)
+                            matched_skill_names.add(req_skill)
+                        break
+                    
+                    # Method 3: Word overlap (at least one common word)
+                    elif req_skill_words & cand_skill_words:
+                        # Check if there's meaningful overlap (not just common words like "and", "or")
+                        common_words = req_skill_words & cand_skill_words
+                        if common_words and not all(w in ['and', 'or', 'the', 'a', 'an'] for w in common_words):
+                            if req_skill not in matched_skill_names:
+                                matched_skills.append(req_skill)
+                                matched_skill_names.add(req_skill)
+                            break
             
             # Calculate match percentage
             match_percentage = (len(matched_skills) / len(required_skills_lower)) * 100 if required_skills_lower else 0
@@ -471,40 +568,65 @@ def match_candidates_with_jd(candidate_excel_path, required_skills, min_match_pe
             # Only include candidates above threshold
             if match_percentage >= min_match_percentage:
                 candidate_data = {
-                    'name': row.get('Candidate Name', 'N/A'),
-                    'email': row.get('Email of Candidate', 'N/A'),
-                    'contact': row.get('Contact Number', 'N/A'),
-                    'location': row.get('Candidate Location', 'N/A'),
-                    'current_company': row.get('Current Company', 'N/A'),
-                    'designation': row.get('Current Designation', 'N/A'),
-                    'experience': row.get('Experience', 'N/A'),
-                    'linkedin': row.get('Linkedin URL', 'N/A'),
-                    'qualification': row.get('Qualification', 'N/A'),
-                    'skills': row.get('Skills', 'N/A'),
-                    'cv_link': row.get('Candidate CV Path', 'N/A'),
-                    'status': row.get('Candidate Status', 'N/A'),
+                    'id': row.get('id', 'N/A'),
+                    'name': row.get('name', 'N/A'),
+                    'email': row.get('email', 'N/A'),
+                    'contact': row.get('contact', 'N/A'),
+                    'location': row.get('location', 'N/A'),
+                    'current_company': row.get('current_company', 'N/A'),
+                    'designation': row.get('designation', 'N/A'),
+                    'experience': row.get('experience', 'N/A'),
+                    'linkedin': row.get('linkedin', 'N/A'),
+                    'qualification': row.get('qualification', 'N/A'),
+                    'skills': row.get('skills', 'N/A'),
+                    'cv_link': row.get('cv_link', 'N/A'),
+                    'status': row.get('status', 'Active'),
                     'matched_skills': matched_skills,
                     'match_percentage': round(match_percentage, 1),
                     'matched_skills_count': len(matched_skills),
                     'total_required_skills': len(required_skills_lower)
                 }
                 matched_candidates.append(candidate_data)
+                
+                # Debug: Print first few matches
+                if len(matched_candidates) <= 3:
+                    print(f"✅ Match {len(matched_candidates)}: {candidate_data['name']} - {match_percentage}% ({len(matched_skills)}/{len(required_skills_lower)} skills)")
         
         # Sort by match percentage (highest first)
         matched_candidates.sort(key=lambda x: x['match_percentage'], reverse=True)
+        
+        print(f"✅ Found {len(matched_candidates)} matching candidates (threshold: {min_match_percentage}%)")
+        
+        if len(matched_candidates) == 0:
+            print(f"⚠️ No candidates matched. Try lowering threshold or check if candidate skills format matches expected format.")
+            print(f"💡 Sample candidate skills (first 3):")
+            for idx, row in df.head(3).iterrows():
+                print(f"   - {row.get('name', 'N/A')}: {row.get('skills', 'N/A')}")
         
         return matched_candidates
     
     except Exception as e:
         print(f"❌ Error matching candidates: {e}")
+        import traceback
+        traceback.print_exc()
         return []
-
 
 def export_matched_candidates(matched_candidates, output_path):
     '''
     Export matched candidates to Excel
+    
+    Args:
+        matched_candidates: List of matched candidate dictionaries
+        output_path: Path where Excel file will be saved
+    
+    Returns:
+        Boolean indicating success
     '''
     try:
+        if not matched_candidates:
+            print("⚠️ No candidates to export")
+            return False
+        
         df = pd.DataFrame(matched_candidates)
         
         # Reorder columns for better readability
@@ -512,12 +634,15 @@ def export_matched_candidates(matched_candidates, output_path):
             'match_percentage', 'matched_skills_count', 'total_required_skills',
             'name', 'email', 'contact', 'designation', 'current_company',
             'experience', 'location', 'qualification', 'linkedin',
-            'skills', 'matched_skills', 'cv_link', 'status'
+            'skills', 'matched_skills', 'cv_link', 'status', 'id'
         ]
         
         # Only include columns that exist
         column_order = [col for col in column_order if col in df.columns]
         df = df[column_order]
+        
+        # Ensure output directory exists
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
         
         # Export to Excel
         df.to_excel(output_path, index=False, engine='openpyxl')
@@ -532,6 +657,9 @@ def export_matched_candidates(matched_candidates, output_path):
 def save_jd_to_excel(jd_data):
     '''
     Save job description data to Excel database
+    
+    Args:
+        jd_data: Dictionary containing job description information
     '''
     try:
         excel_path = Path(settings.EXCEL_DATABASE_PATH)
@@ -558,7 +686,3 @@ def save_jd_to_excel(jd_data):
         
     except Exception as e:
         print(f"❌ Error saving JD data to Excel: {e}")
-
-        
-        
-        

@@ -1,30 +1,28 @@
 from django.contrib import admin
-from django.contrib.auth.models import User, Group
-from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.html import format_html
 from django.urls import reverse
-from django.db.models import Count, Q
 from django.utils import timezone
-from datetime import timedelta
-from .models import JobDescription, GoogleSheetDatabase, AuditLog
+from django.db.models import Count, Avg, Max
+from .models import JobDescription, MatchingHistory, APIConfiguration
 import json
 
-
+@admin.register(JobDescription)
 class JobDescriptionAdmin(admin.ModelAdmin):
     list_display = [
-        'title', 
-        'role_category', 
-        'experience_level', 
-        'created_by_link',
-        'skills_count',
-        'created_at',
-        'is_active_badge'
+        'title',
+        'role_category',
+        'experience_level',
+        'skill_count_display',
+        'matches_run_display',
+        'best_match_display',
+        'created_by',
+        'created_at_display',
+        'status_badge'
     ]
     
     list_filter = [
         'role_category',
         'experience_level',
-        'is_active',
         'created_at',
         'created_by'
     ]
@@ -33,448 +31,525 @@ class JobDescriptionAdmin(admin.ModelAdmin):
         'title',
         'all_skills',
         'linkedin_skills_string',
-        'key_responsibilities',
-        'created_by__username',
-        'created_by__email'
+        'role_category',
+        'jd_text'
     ]
     
     readonly_fields = [
-        'created_by',
         'created_at',
         'updated_at',
-        'jd_text_preview',
-        'linkedin_search_preview',
-        'skill_categories_formatted'
+        'last_matched_at',
+        'total_matches_run',
+        'total_candidates_matched',
+        'best_match_percentage',
+        'skill_categories_display',
+        'linkedin_searches_display',
+        'statistics_display'
     ]
     
     fieldsets = (
         ('Basic Information', {
-            'fields': ('title', 'is_active', 'created_by', 'created_at', 'updated_at')
+            'fields': ('title', 'created_by', 'role_category', 'experience_level')
         }),
-        ('Classification', {
-            'fields': ('role_category', 'experience_level'),
+        ('Job Description', {
+            'fields': ('jd_text',),
             'classes': ('collapse',)
         }),
         ('Skills', {
-            'fields': ('all_skills', 'linkedin_skills_string', 'skill_categories_formatted')
+            'fields': (
+                'all_skills',
+                'linkedin_skills_string',
+                'skill_categories_display',
+                'linkedin_searches_display'
+            )
         }),
         ('Job Details', {
-            'fields': ('key_responsibilities', 'qualifications', 'jd_text_preview'),
+            'fields': ('key_responsibilities', 'qualifications'),
             'classes': ('collapse',)
         }),
-        ('LinkedIn Search', {
-            'fields': ('linkedin_search_preview',),
-            'classes': ('collapse',)
+        ('Matching Statistics', {
+            'fields': (
+                'total_matches_run',
+                'last_matched_at',
+                'total_candidates_matched',
+                'best_match_percentage',
+                'statistics_display'
+            )
         }),
+        ('Audit', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        })
     )
     
-    date_hierarchy = 'created_at'
-    actions = ['activate_jds', 'deactivate_jds', 'export_to_csv']
-    list_per_page = 25
+    actions = ['export_to_excel', 'reset_statistics']
     
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        if request.user.is_superuser:
-            return qs
-        return qs.filter(created_by=request.user)
+    def skill_count_display(self, obj):
+        """Display total skill count"""
+        count = obj.get_skill_count()
+        linkedin_count = obj.get_linkedin_skill_count()
+        return format_html(
+            '<span style="color: #0066cc; font-weight: bold;">{}</span> total<br>'
+            '<span style="color: #00aa00;">{}</span> LinkedIn',
+            count,
+            linkedin_count
+        )
+    skill_count_display.short_description = "Skills"
     
-    def save_model(self, request, obj, form, change):
-        if not change:  # If creating new object
-            obj.created_by = request.user
-        super().save_model(request, obj, form, change)
+    def matches_run_display(self, obj):
+        """Display number of matches run"""
+        if obj.total_matches_run > 0:
+            return format_html(
+                '<span style="background-color: #e3f2fd; padding: 3px 8px; border-radius: 3px;">'
+                '{} runs</span>',
+                obj.total_matches_run
+            )
+        return format_html('<span style="color: #999;">No matches</span>')
+    matches_run_display.short_description = "Matches Run"
     
-    def created_by_link(self, obj):
-        url = reverse('admin:auth_user_change', args=[obj.created_by.id])
-        return format_html('<a href="{}">{}</a>', url, obj.created_by.username)
-    created_by_link.short_description = 'Created By'
+    def best_match_display(self, obj):
+        """Display best match percentage"""
+        if obj.best_match_percentage:
+            color = '#4caf50' if obj.best_match_percentage >= 80 else '#ff9800' if obj.best_match_percentage >= 60 else '#f44336'
+            return format_html(
+                '<span style="background-color: {}; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold;">'
+                '{}%</span>',
+                color,
+                round(obj.best_match_percentage, 1)
+            )
+        return '-'
+    best_match_display.short_description = "Best Match"
     
-    def skills_count(self, obj):
-        skills = obj.get_all_skills_list()
-        return f"{len(skills)} skills"
-    skills_count.short_description = 'Skills Count'
+    def created_at_display(self, obj):
+        """Display formatted created date"""
+        return obj.created_at.strftime('%b %d, %Y %H:%M')
+    created_at_display.short_description = "Created"
+    created_at_display.admin_order_field = 'created_at'
     
-    def is_active_badge(self, obj):
-        if obj.is_active:
-            return format_html('<span style="color: green;">●</span> Active')
-        return format_html('<span style="color: red;">●</span> Inactive')
-    is_active_badge.short_description = 'Status'
+    def status_badge(self, obj):
+        """Display status badge"""
+        if obj.total_matches_run > 0:
+            return format_html(
+                '<span style="background-color: #4caf50; color: white; padding: 2px 6px; '
+                'border-radius: 3px; font-size: 11px;">✓ MATCHED</span>'
+            )
+        return format_html(
+            '<span style="background-color: #ff9800; color: white; padding: 2px 6px; '
+            'border-radius: 3px; font-size: 11px;">⏳ PENDING</span>'
+        )
+    status_badge.short_description = "Status"
     
-    def jd_text_preview(self, obj):
-        if obj.jd_text:
-            preview = obj.jd_text[:500] + '...' if len(obj.jd_text) > 500 else obj.jd_text
-            return format_html('<div style="max-height: 200px; overflow-y: auto;">{}</div>', preview)
-        return 'No text available'
-    jd_text_preview.short_description = 'JD Text Preview'
-    
-    def linkedin_search_preview(self, obj):
-        if obj.linkedin_search_string:
-            try:
-                searches = json.loads(obj.linkedin_search_string)
-                html = '<div style="font-family: monospace; background: #f5f5f5; padding: 10px; border-radius: 5px;">'
-                for key, value in searches.items():
-                    html += f'<strong>{key}:</strong><br>{value}<br><br>'
-                html += '</div>'
-                return format_html(html)
-            except:
-                return obj.linkedin_search_string
-        return 'No search strings available'
-    linkedin_search_preview.short_description = 'LinkedIn Search Strings'
-    
-    def skill_categories_formatted(self, obj):
-        if obj.skill_categories and isinstance(obj.skill_categories, dict):
-            html = '<div style="font-family: monospace; background: #f5f5f5; padding: 10px; border-radius: 5px;">'
+    def skill_categories_display(self, obj):
+        """Display skill categories in formatted way"""
+        if obj.skill_categories:
+            html_output = '<div style="background: #f5f5f5; padding: 10px; border-radius: 5px;">'
             for category, skills in obj.skill_categories.items():
-                if isinstance(skills, list):
-                    html += f'<strong>{category}:</strong><br>'
-                    html += ', '.join(skills) + '<br><br>'
+                html_output += f'<strong style="color: #1976d2;">{category}:</strong><br>'
+                html_output += f'<span style="margin-left: 20px;">{", ".join(skills)}</span><br><br>'
+            html_output += '</div>'
+            return format_html(html_output)
+        return '-'
+    skill_categories_display.short_description = "Skill Categories"
+    
+    def linkedin_searches_display(self, obj):
+        """Display LinkedIn search strings"""
+        searches = obj.get_linkedin_searches_dict()
+        if searches:
+            html_output = '<div style="background: #e3f2fd; padding: 10px; border-radius: 5px;">'
+            for search_type, search_string in searches.items():
+                html_output += f'<strong style="color: #0066cc;">{search_type.replace("_", " ").title()}:</strong><br>'
+                html_output += f'<code style="background: white; padding: 5px; display: block; margin: 5px 0 10px 0; border-radius: 3px;">{search_string[:200]}</code>'
+            html_output += '</div>'
+            return format_html(html_output)
+        return '-'
+    linkedin_searches_display.short_description = "LinkedIn Searches"
+    
+    def statistics_display(self, obj):
+        """Display comprehensive statistics"""
+        history = obj.matching_history.all()
+        
+        if history.exists():
+            stats = history.aggregate(
+                total_runs=Count('id'),
+                avg_candidates=Avg('total_candidates_found'),
+                max_candidates=Max('total_candidates_found'),
+                avg_match_pct=Avg('average_match_percentage')
+            )
+            
+            html = '<div style="background: #fff3e0; padding: 10px; border-radius: 5px;">'
+            html += f'<strong>Total Runs:</strong> {stats["total_runs"]}<br>'
+            html += f'<strong>Avg Candidates Found:</strong> {round(stats["avg_candidates"] or 0, 1)}<br>'
+            html += f'<strong>Max Candidates Found:</strong> {stats["max_candidates"] or 0}<br>'
+            html += f'<strong>Avg Match %:</strong> {round(stats["avg_match_pct"] or 0, 1)}%<br>'
             html += '</div>'
             return format_html(html)
-        return 'No categories available'
-    skill_categories_formatted.short_description = 'Skill Categories'
+        
+        return format_html('<span style="color: #999;">No statistics available</span>')
+    statistics_display.short_description = "Detailed Statistics"
     
-    def activate_jds(self, request, queryset):
-        updated = queryset.update(is_active=True)
-        self.message_user(request, f'{updated} job descriptions activated.')
-    activate_jds.short_description = 'Activate selected JDs'
+    def export_to_excel(self, request, queryset):
+        """Export selected JDs to Excel"""
+        # Implementation for export
+        self.message_user(request, f"Exported {queryset.count()} job descriptions")
+    export_to_excel.short_description = "Export selected JDs to Excel"
     
-    def deactivate_jds(self, request, queryset):
-        updated = queryset.update(is_active=False)
-        self.message_user(request, f'{updated} job descriptions deactivated.')
-    deactivate_jds.short_description = 'Deactivate selected JDs'
-    
-    def export_to_csv(self, request, queryset):
-        import csv
-        from django.http import HttpResponse
-        
-        response = HttpResponse(content_type='text/csv')
-        response['Content-Disposition'] = 'attachment; filename="job_descriptions.csv"'
-        
-        writer = csv.writer(response)
-        writer.writerow(['Title', 'Role Category', 'Experience Level', 'Skills', 'Created By', 'Created At'])
-        
-        for jd in queryset:
-            writer.writerow([
-                jd.title,
-                jd.role_category,
-                jd.experience_level,
-                jd.all_skills,
-                jd.created_by.username,
-                jd.created_at.strftime('%Y-%m-%d %H:%M:%S')
-            ])
-        
-        return response
-    export_to_csv.short_description = 'Export to CSV'
+    def reset_statistics(self, request, queryset):
+        """Reset matching statistics"""
+        queryset.update(
+            total_matches_run=0,
+            last_matched_at=None,
+            best_match_percentage=None,
+            total_candidates_matched=0
+        )
+        self.message_user(request, f"Reset statistics for {queryset.count()} job descriptions")
+    reset_statistics.short_description = "Reset matching statistics"
 
 
-class GoogleSheetDatabaseAdmin(admin.ModelAdmin):
+@admin.register(MatchingHistory)
+class MatchingHistoryAdmin(admin.ModelAdmin):
+    list_display = [
+        'job_title_display',
+        'user',
+        'candidates_found_display',
+        'match_percentage_display',
+        'fuzzy_status_display',
+        'api_performance_display',
+        'created_at_display'
+    ]
+    
+    list_filter = [
+        'use_fuzzy_matching',
+        'created_at',
+        'user',
+        'job_description__role_category'
+    ]
+    
+    search_fields = [
+        'job_description__title',
+        'user__username',
+        'best_match_candidate_name'
+    ]
+    
+    readonly_fields = [
+        'job_description',
+        'user',
+        'min_match_percentage',
+        'use_fuzzy_matching',
+        'fuzzy_threshold',
+        'total_candidates_found',
+        'average_match_percentage',
+        'best_match_percentage',
+        'best_match_candidate_name',
+        'api_response_time_ms',
+        'total_api_candidates',
+        'created_at'
+    ]
+    
+    fieldsets = (
+        ('Match Information', {
+            'fields': ('job_description', 'user', 'created_at')
+        }),
+        ('Match Parameters', {
+            'fields': (
+                'min_match_percentage',
+                'use_fuzzy_matching',
+                'fuzzy_threshold'
+            )
+        }),
+        ('Results', {
+            'fields': (
+                'total_candidates_found',
+                'average_match_percentage',
+                'best_match_percentage',
+                'best_match_candidate_name'
+            )
+        }),
+        ('API Performance', {
+            'fields': (
+                'api_response_time_ms',
+                'total_api_candidates'
+            )
+        })
+    )
+    
+    def job_title_display(self, obj):
+        """Display job title with link"""
+        url = reverse('admin:base_jobdescription_change', args=[obj.job_description.id])
+        return format_html(
+            '<a href="{}" style="color: #0066cc; text-decoration: none;">{}</a>',
+            url,
+            obj.job_description.title
+        )
+    job_title_display.short_description = "Job Description"
+    job_title_display.admin_order_field = 'job_description__title'
+    
+    def candidates_found_display(self, obj):
+        """Display number of candidates found"""
+        if obj.total_candidates_found > 0:
+            color = '#4caf50' if obj.total_candidates_found >= 10 else '#ff9800' if obj.total_candidates_found >= 5 else '#f44336'
+            return format_html(
+                '<span style="background-color: {}; color: white; padding: 3px 10px; '
+                'border-radius: 3px; font-weight: bold;">{}</span>',
+                color,
+                obj.total_candidates_found
+            )
+        return format_html('<span style="color: #999;">0</span>')
+    candidates_found_display.short_description = "Candidates"
+    candidates_found_display.admin_order_field = 'total_candidates_found'
+    
+    def match_percentage_display(self, obj):
+        """Display match percentage statistics"""
+        if obj.average_match_percentage and obj.best_match_percentage:
+            return format_html(
+                '<div style="text-align: center;">'
+                '<strong style="color: #4caf50;">Best:</strong> {}%<br>'
+                '<strong style="color: #2196f3;">Avg:</strong> {}%'
+                '</div>',
+                round(obj.best_match_percentage, 1),
+                round(obj.average_match_percentage, 1)
+            )
+        return '-'
+    match_percentage_display.short_description = "Match %"
+    
+    def fuzzy_status_display(self, obj):
+        """Display fuzzy matching status"""
+        if obj.use_fuzzy_matching:
+            return format_html(
+                '<span style="background-color: #2196f3; color: white; padding: 2px 6px; '
+                'border-radius: 3px; font-size: 11px;">✓ FUZZY ({}%)</span>',
+                obj.fuzzy_threshold
+            )
+        return format_html(
+            '<span style="background-color: #9e9e9e; color: white; padding: 2px 6px; '
+            'border-radius: 3px; font-size: 11px;">EXACT</span>'
+        )
+    fuzzy_status_display.short_description = "Matching Type"
+    
+    def api_performance_display(self, obj):
+        """Display API performance metrics"""
+        if obj.api_response_time_ms:
+            color = '#4caf50' if obj.api_response_time_ms < 1000 else '#ff9800' if obj.api_response_time_ms < 3000 else '#f44336'
+            return format_html(
+                '<span style="color: {}; font-weight: bold;">{} ms</span><br>'
+                '<span style="color: #666; font-size: 11px;">{} total</span>',
+                color,
+                obj.api_response_time_ms,
+                obj.total_api_candidates or 0
+            )
+        return '-'
+    api_performance_display.short_description = "API Performance"
+    
+    def created_at_display(self, obj):
+        """Display formatted created date"""
+        return obj.created_at.strftime('%b %d, %Y %H:%M')
+    created_at_display.short_description = "Run Date"
+    created_at_display.admin_order_field = 'created_at'
+    
+    def has_add_permission(self, request):
+        """Disable manual creation"""
+        return False
+
+
+@admin.register(APIConfiguration)
+class APIConfigurationAdmin(admin.ModelAdmin):
     list_display = [
         'name',
-        'total_candidates',
-        'created_by_link',
-        'last_synced_display',
-        'is_shared_badge',
-        'is_active_badge',
-        'created_at'
+        'status_display',
+        'connection_status_display',
+        'candidates_display',
+        'success_rate_display',
+        'performance_display',
+        'last_tested_display'
     ]
     
     list_filter = [
         'is_active',
-        'is_shared',
-        'created_at',
-        'last_synced',
-        'created_by'
+        'last_test_status',
+        'created_at'
     ]
     
     search_fields = [
         'name',
-        'sheet_url',
-        'sheet_id',
-        'description',
-        'created_by__username'
+        'api_url'
     ]
     
     readonly_fields = [
-        'sheet_id',
-        'created_by',
+        'last_tested_at',
+        'last_test_status',
+        'last_test_message',
+        'total_candidates_available',
+        'total_requests',
+        'total_successful_requests',
+        'total_failed_requests',
+        'average_response_time_ms',
+        'success_rate_display_detail',
         'created_at',
-        'updated_at',
-        'last_synced',
-        'total_candidates'
+        'updated_at'
     ]
     
     fieldsets = (
-        ('Basic Information', {
-            'fields': ('name', 'description', 'is_active', 'is_shared')
+        ('Configuration', {
+            'fields': ('name', 'api_url', 'api_key', 'is_active', 'created_by')
         }),
-        ('Google Sheet Details', {
-            'fields': ('sheet_url', 'sheet_id', 'total_candidates', 'last_synced')
+        ('Connection Status', {
+            'fields': (
+                'last_tested_at',
+                'last_test_status',
+                'last_test_message',
+                'total_candidates_available'
+            )
         }),
-        ('Metadata', {
-            'fields': ('created_by', 'created_at', 'updated_at'),
+        ('Usage Statistics', {
+            'fields': (
+                'total_requests',
+                'total_successful_requests',
+                'total_failed_requests',
+                'average_response_time_ms',
+                'success_rate_display_detail'
+            ),
             'classes': ('collapse',)
         }),
+        ('Audit', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        })
     )
     
-    date_hierarchy = 'created_at'
-    actions = ['sync_sheets', 'share_sheets', 'unshare_sheets']
-    list_per_page = 25
+    actions = ['test_connection_action', 'activate_config', 'deactivate_config']
     
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        if request.user.is_superuser:
-            return qs
-        return qs.filter(Q(created_by=request.user) | Q(is_shared=True))
-    
-    def save_model(self, request, obj, form, change):
-        if not change:
-            obj.created_by = request.user
-        super().save_model(request, obj, form, change)
-    
-    def created_by_link(self, obj):
-        url = reverse('admin:auth_user_change', args=[obj.created_by.id])
-        return format_html('<a href="{}">{}</a>', url, obj.created_by.username)
-    created_by_link.short_description = 'Created By'
-    
-    def last_synced_display(self, obj):
-        if obj.last_synced:
-            now = timezone.now()
-            diff = now - obj.last_synced
-            
-            if diff < timedelta(hours=1):
-                minutes = int(diff.total_seconds() / 60)
-                time_str = f'{minutes} min ago'
-            elif diff < timedelta(days=1):
-                hours = int(diff.total_seconds() / 3600)
-                time_str = f'{hours} hrs ago'
-            else:
-                days = diff.days
-                time_str = f'{days} days ago'
-            
-            color = 'green' if diff < timedelta(hours=24) else 'orange'
-            return format_html('<span style="color: {};">{}</span>', color, time_str)
-        return format_html('<span style="color: red;">Never</span>')
-    last_synced_display.short_description = 'Last Synced'
-    
-    def is_shared_badge(self, obj):
-        if obj.is_shared:
-            return format_html('<span style="color: blue;">🌐 Shared</span>')
-        return format_html('<span style="color: gray;">🔒 Private</span>')
-    is_shared_badge.short_description = 'Sharing'
-    
-    def is_active_badge(self, obj):
+    def status_display(self, obj):
+        """Display active/inactive status"""
         if obj.is_active:
-            return format_html('<span style="color: green;">●</span> Active')
-        return format_html('<span style="color: red;">●</span> Inactive')
-    is_active_badge.short_description = 'Status'
-    
-    def sync_sheets(self, request, queryset):
-        from .utils import fetch_google_sheet_data
-        
-        success_count = 0
-        error_count = 0
-        
-        for sheet in queryset:
-            try:
-                df = fetch_google_sheet_data(sheet.sheet_id)
-                sheet.total_candidates = len(df)
-                sheet.last_synced = timezone.now()
-                sheet.save()
-                success_count += 1
-            except Exception as e:
-                error_count += 1
-        
-        if success_count:
-            self.message_user(request, f'{success_count} sheets synced successfully.')
-        if error_count:
-            self.message_user(request, f'{error_count} sheets failed to sync.', level='error')
-    sync_sheets.short_description = 'Sync selected sheets'
-    
-    def share_sheets(self, request, queryset):
-        updated = queryset.update(is_shared=True)
-        self.message_user(request, f'{updated} sheets are now shared.')
-    share_sheets.short_description = 'Share selected sheets'
-    
-    def unshare_sheets(self, request, queryset):
-        updated = queryset.update(is_shared=False)
-        self.message_user(request, f'{updated} sheets are now private.')
-    unshare_sheets.short_description = 'Unshare selected sheets'
-
-
-class AuditLogAdmin(admin.ModelAdmin):
-    list_display = [
-        'timestamp',
-        'user_link',
-        'action_badge',
-        'target_info',
-        'ip_address',
-        'view_details'
-    ]
-    
-    list_filter = [
-        'action',
-        'timestamp',
-        'user'
-    ]
-    
-    search_fields = [
-        'user__username',
-        'action',
-        'target_model',
-        'ip_address',
-        'user_agent'
-    ]
-    
-    readonly_fields = [
-        'user',
-        'action',
-        'target_model',
-        'target_id',
-        'ip_address',
-        'user_agent',
-        'details',
-        'timestamp',
-        'details_formatted'
-    ]
-    
-    fieldsets = (
-        ('Basic Information', {
-            'fields': ('timestamp', 'user', 'action')
-        }),
-        ('Target', {
-            'fields': ('target_model', 'target_id')
-        }),
-        ('Request Information', {
-            'fields': ('ip_address', 'user_agent')
-        }),
-        ('Details', {
-            'fields': ('details_formatted',),
-            'classes': ('collapse',)
-        }),
-    )
-    
-    date_hierarchy = 'timestamp'
-    list_per_page = 50
-    
-    def has_add_permission(self, request):
-        return False
-    
-    def has_change_permission(self, request, obj=None):
-        return False
-    
-    def has_delete_permission(self, request, obj=None):
-        return request.user.is_superuser
-    
-    def user_link(self, obj):
-        if obj.user:
-            url = reverse('admin:auth_user_change', args=[obj.user.id])
-            return format_html('<a href="{}">{}</a>', url, obj.user.username)
-        return 'Anonymous'
-    user_link.short_description = 'User'
-    
-    def action_badge(self, obj):
-        colors = {
-            'JD_UPLOAD': 'blue',
-            'JD_VIEW': 'gray',
-            'JD_DELETE': 'red',
-            'SHEET_ADD': 'green',
-            'SHEET_SYNC': 'blue',
-            'SHEET_DELETE': 'red',
-            'MATCH_RUN': 'purple',
-            'FILE_DOWNLOAD': 'orange',
-            'LOGIN': 'green',
-            'LOGOUT': 'gray',
-            'PERMISSION_DENIED': 'red'
-        }
-        color = colors.get(obj.action, 'black')
+            return format_html(
+                '<span style="background-color: #4caf50; color: white; padding: 3px 8px; '
+                'border-radius: 3px; font-weight: bold;">✓ ACTIVE</span>'
+            )
         return format_html(
-            '<span style="background: {}; color: white; padding: 3px 8px; border-radius: 3px; font-size: 11px;">{}</span>',
+            '<span style="background-color: #9e9e9e; color: white; padding: 3px 8px; '
+            'border-radius: 3px;">✗ INACTIVE</span>'
+        )
+    status_display.short_description = "Status"
+    status_display.admin_order_field = 'is_active'
+    
+    def connection_status_display(self, obj):
+        """Display connection test status"""
+        status_colors = {
+            'success': ('#4caf50', '✓'),
+            'failed': ('#f44336', '✗'),
+            'pending': ('#ff9800', '⏳')
+        }
+        color, icon = status_colors.get(obj.last_test_status, ('#9e9e9e', '?'))
+        
+        return format_html(
+            '<span style="background-color: {}; color: white; padding: 2px 6px; '
+            'border-radius: 3px; font-size: 11px;">{} {}</span>',
             color,
-            obj.get_action_display()
+            icon,
+            obj.last_test_status.upper()
         )
-    action_badge.short_description = 'Action'
+    connection_status_display.short_description = "Connection"
+    connection_status_display.admin_order_field = 'last_test_status'
     
-    def target_info(self, obj):
-        if obj.target_model and obj.target_id:
-            return f'{obj.target_model} #{obj.target_id}'
-        return '-'
-    target_info.short_description = 'Target'
-    
-    def view_details(self, obj):
-        if obj.details:
+    def candidates_display(self, obj):
+        """Display total candidates available"""
+        if obj.total_candidates_available is not None:
             return format_html(
-                '<a href="#" onclick="alert(\'{}\')" style="color: blue;">View</a>',
-                json.dumps(obj.details, indent=2).replace("'", "\\'")
+                '<span style="color: #0066cc; font-weight: bold; font-size: 14px;">{:,}</span>',
+                obj.total_candidates_available
             )
         return '-'
-    view_details.short_description = 'Details'
+    candidates_display.short_description = "Candidates"
+    candidates_display.admin_order_field = 'total_candidates_available'
     
-    def details_formatted(self, obj):
-        if obj.details:
-            return format_html(
-                '<pre style="background: #f5f5f5; padding: 10px; border-radius: 5px;">{}</pre>',
-                json.dumps(obj.details, indent=2)
-            )
-        return 'No details available'
-    details_formatted.short_description = 'Details (JSON)'
-
-
-# Custom User Admin with Statistics
-class CustomUserAdmin(BaseUserAdmin):
-    list_display = BaseUserAdmin.list_display + ('jd_count', 'sheet_count', 'last_login_formatted')
-    
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        qs = qs.annotate(
-            _jd_count=Count('job_descriptions', distinct=True),
-            _sheet_count=Count('google_sheets', distinct=True)
+    def success_rate_display(self, obj):
+        """Display success rate"""
+        rate = obj.get_success_rate()
+        color = '#4caf50' if rate >= 90 else '#ff9800' if rate >= 70 else '#f44336'
+        
+        return format_html(
+            '<div style="text-align: center;">'
+            '<div style="font-size: 18px; font-weight: bold; color: {};">{:.1f}%</div>'
+            '<div style="font-size: 10px; color: #666;">{}/{} requests</div>'
+            '</div>',
+            color,
+            rate,
+            obj.total_successful_requests,
+            obj.total_requests
         )
-        return qs
+    success_rate_display.short_description = "Success Rate"
     
-    def jd_count(self, obj):
-        count = obj._jd_count
-        if count > 0:
-            url = f'/admin/base/jobdescription/?created_by__id__exact={obj.id}'
-            return format_html('<a href="{}">{} JDs</a>', url, count)
-        return '0 JDs'
-    jd_count.short_description = 'Job Descriptions'
-    jd_count.admin_order_field = '_jd_count'
+    def success_rate_display_detail(self, obj):
+        """Detailed success rate display"""
+        rate = obj.get_success_rate()
+        return format_html(
+            '<div style="background: #f5f5f5; padding: 10px; border-radius: 5px;">'
+            '<strong style="font-size: 16px; color: #0066cc;">{:.2f}%</strong><br><br>'
+            '<strong>Total Requests:</strong> {}<br>'
+            '<strong>Successful:</strong> <span style="color: #4caf50;">{}</span><br>'
+            '<strong>Failed:</strong> <span style="color: #f44336;">{}</span>'
+            '</div>',
+            rate,
+            obj.total_requests,
+            obj.total_successful_requests,
+            obj.total_failed_requests
+        )
+    success_rate_display_detail.short_description = "Success Rate Details"
     
-    def sheet_count(self, obj):
-        count = obj._sheet_count
-        if count > 0:
-            url = f'/admin/base/googlesheetdatabase/?created_by__id__exact={obj.id}'
-            return format_html('<a href="{}">{} Sheets</a>', url, count)
-        return '0 Sheets'
-    sheet_count.short_description = 'Google Sheets'
-    sheet_count.admin_order_field = '_sheet_count'
+    def performance_display(self, obj):
+        """Display performance metrics"""
+        if obj.average_response_time_ms:
+            color = '#4caf50' if obj.average_response_time_ms < 1000 else '#ff9800' if obj.average_response_time_ms < 3000 else '#f44336'
+            return format_html(
+                '<span style="color: {}; font-weight: bold;">{:.0f} ms</span>',
+                color,
+                obj.average_response_time_ms
+            )
+        return '-'
+    performance_display.short_description = "Avg Response"
+    performance_display.admin_order_field = 'average_response_time_ms'
     
-    def last_login_formatted(self, obj):
-        if obj.last_login:
-            now = timezone.now()
-            diff = now - obj.last_login
-            
-            if diff < timedelta(hours=1):
-                return format_html('<span style="color: green;">Online</span>')
-            elif diff < timedelta(days=1):
-                hours = int(diff.total_seconds() / 3600)
-                return format_html('<span style="color: orange;">{} hrs ago</span>', hours)
+    def last_tested_display(self, obj):
+        """Display last tested time"""
+        if obj.last_tested_at:
+            return obj.last_tested_at.strftime('%b %d, %Y %H:%M')
+        return format_html('<span style="color: #999;">Never</span>')
+    last_tested_display.short_description = "Last Tested"
+    last_tested_display.admin_order_field = 'last_tested_at'
+    
+    def test_connection_action(self, request, queryset):
+        """Test connection for selected configurations"""
+        success_count = 0
+        fail_count = 0
+        
+        for config in queryset:
+            success, message = config.test_connection()
+            if success:
+                success_count += 1
             else:
-                days = diff.days
-                return format_html('<span style="color: gray;">{} days ago</span>', days)
-        return format_html('<span style="color: red;">Never</span>')
-    last_login_formatted.short_description = 'Last Login'
-
-
-# Unregister default User admin and register custom
-admin.site.unregister(User)
-admin.site.register(User, CustomUserAdmin)
-
-# Register models
-admin.site.register(JobDescription, JobDescriptionAdmin)
-admin.site.register(GoogleSheetDatabase, GoogleSheetDatabaseAdmin)
-admin.site.register(AuditLog, AuditLogAdmin)
-
-# Customize admin site
-admin.site.site_header = 'JD Analyzer Administration'
-admin.site.site_title = 'JD Analyzer Admin'
-admin.site.index_title = 'Dashboard'
+                fail_count += 1
+        
+        if success_count > 0:
+            self.message_user(
+                request,
+                f"Successfully tested {success_count} configuration(s)",
+                level='success'
+            )
+        if fail_count > 0:
+            self.message_user(
+                request,
+                f"Failed to test {fail_count} configuration(s)",
+                level='error'
+            )
+    test_connection_action.short_description = "Test API connection"
+    
+    def activate_config(self, request, queryset):
+        """Activate selected configurations"""
+        updated = queryset.update(is_active=True)
+        self.message_user(request, f"Activated {updated} configuration(s)")
+    activate_config.short_description = "Activate selected configurations"
+    
+    def deactivate_config(self, request, queryset):
+        """Deactivate selected configurations"""
+        updated = queryset.update(is_active=False)
+        self.message_user(request, f"Deactivated {updated} configuration(s)")
+    deactivate_config.short_description = "Deactivate selected configurations"

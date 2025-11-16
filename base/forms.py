@@ -1,5 +1,5 @@
 from django import forms
-from .models import JobDescription, GoogleSheetDatabase
+from .models import JobDescription
 
 class JDUploadForm(forms.ModelForm):
     domain = forms.ChoiceField(
@@ -24,39 +24,22 @@ class JDUploadForm(forms.ModelForm):
             'file': forms.FileInput(attrs={'class': 'form-control', 'accept': '.txt,.pdf,.docx'}),
         }
 
-
-class GoogleSheetForm(forms.ModelForm):
-    class Meta:
-        model = GoogleSheetDatabase
-        fields = ['name', 'sheet_url']
-        widgets = {
-            'name': forms.TextInput(attrs={
-                'class': 'form-control', 
-                'placeholder': 'e.g., Tech Candidates 2025'
-            }),
-            'sheet_url': forms.URLInput(attrs={
-                'class': 'form-control', 
-                'placeholder': 'https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/edit'
-            }),
-        }
-        help_texts = {
-            'sheet_url': 'Make sure the Google Sheet is shared with the service account email'
-        }
-
-
 class CandidateMatchForm(forms.Form):
-    google_sheet = forms.ModelChoiceField(
-        queryset=GoogleSheetDatabase.objects.filter(is_active=True),
-        widget=forms.Select(attrs={'class': 'form-select'}),
-        label='Select Google Sheet Database',
-        empty_label='Choose a Google Sheet...'
-    )
-    
     min_match_percentage = forms.IntegerField(
+        min_value=0, 
+        max_value=100, 
         initial=50,
-        min_value=0,
+        label="Minimum Match Percentage"
+    )
+    use_fuzzy_matching = forms.BooleanField(
+        initial=True,
+        required=False,
+        label="Use Fuzzy Matching"
+    )
+    fuzzy_threshold = forms.IntegerField(
+        min_value=50,
         max_value=100,
-        widget=forms.NumberInput(attrs={'class': 'form-control', 'placeholder': '50'}),
-        label='Minimum Match Percentage',
-        help_text='Candidates must match at least this percentage of required skills'
+        initial=85,
+        required=False,
+        label="Fuzzy Match Threshold (%)"
     )

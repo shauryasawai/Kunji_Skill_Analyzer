@@ -7,11 +7,11 @@ from django.views.decorators.csrf import csrf_protect
 from django.core.exceptions import PermissionDenied
 from django.utils.decorators import method_decorator
 from django.db.models import Q
-from .forms import JDUploadForm, GoogleSheetForm, CandidateMatchForm
-from .models import JobDescription, GoogleSheetDatabase
+from .forms import JDUploadForm, CandidateMatchForm
+from .models import JobDescription
 from .utils import (cleanup_old_matched_files, extract_text_from_file, extract_skills_from_jd, save_jd_to_excel, 
-                    generate_linkedin_search_strings, match_candidates_from_google_sheet,
-                    export_matched_candidates, fetch_google_sheet_data)
+                    generate_linkedin_search_strings, match_candidates_with_jd,
+                    export_matched_candidates, fetch_candidates_from_api)
 from datetime import datetime
 from django.conf import settings
 from django.utils import timezone
@@ -68,7 +68,7 @@ def upload_jd(request):
             
             jd = form.save(commit=False)
             jd.created_by = request.user
-            jd.file = request.FILES['file']# Associate with user
+            jd.file = request.FILES['file']  # Associate with user
             jd.save()
             
             domain = request.POST.get('domain', '')
@@ -172,17 +172,19 @@ def results(request, pk):
             linkedin_searches = {}
             logger.error(f"Failed to parse LinkedIn search strings for JD {pk}")
     
-    # Get available Google Sheet databases (user's own or shared)
-    if request.user.is_staff:
-        google_sheets = GoogleSheetDatabase.objects.filter(is_active=True)
-    else:
-        google_sheets = GoogleSheetDatabase.objects.filter(
-            Q(created_by=request.user) | Q(is_shared=True),
-            is_active=True
-        )
+    # Check API availability
+    api_available = hasattr(settings, 'CANDIDATES_API_URL') and settings.CANDIDATES_API_URL
+    
+    # Get candidate count from API (optional - for display purposes)
+    total_candidates = 0
+    if api_available:
+        try:
+            df = fetch_candidates_from_api()
+            total_candidates = len(df) if not df.empty else 0
+        except Exception as e:
+            logger.warning(f"Failed to fetch candidate count: {str(e)}")
     
     match_form = CandidateMatchForm()
-    match_form.fields['google_sheet'].queryset = google_sheets
     
     context = {
         'jd': jd,
@@ -192,96 +194,18 @@ def results(request, pk):
         'skill_categories': jd.skill_categories,
         'responsibilities': jd.get_responsibilities_list(),
         'qualifications': jd.get_qualifications_list(),
-        'google_sheets': google_sheets,
         'match_form': match_form,
+        'api_available': api_available,
+        'total_candidates': total_candidates,
     }
     
     return render(request, 'base/results.html', context)
 
 @login_required
-@csrf_protect
-@require_http_methods(["GET", "POST"])
-def add_google_sheet(request):
-    """Add a new Google Sheet database - requires authentication"""
-    if request.method == 'POST':
-        form = GoogleSheetForm(request.POST)
-        
-        if form.is_valid():
-            sheet_db = form.save(commit=False)
-            sheet_db.created_by = request.user  # Associate with user
-            
-            # Extract sheet ID from URL
-            sheet_id = sheet_db.extract_sheet_id()
-            
-            if not sheet_id:
-                messages.error(request, "Invalid Google Sheets URL. Please check and try again.")
-                logger.warning(f"Invalid Google Sheet URL provided by user {request.user.id}")
-                return render(request, 'base/add_google_sheet.html', {'form': form})
-            
-            # Try to fetch data to validate access
-            try:
-                df = fetch_google_sheet_data(sheet_id)
-                sheet_db.total_candidates = len(df)
-                sheet_db.last_synced = timezone.now()
-                sheet_db.save()
-                
-                logger.info(f"Google Sheet {sheet_db.id} added successfully by user {request.user.id}")
-                messages.success(request, f"Google Sheet added successfully! {sheet_db.total_candidates} candidates found.")
-                return redirect('manage_google_sheets')
-            
-            except Exception as e:
-                logger.error(f"Failed to access Google Sheet by user {request.user.id}: {str(e)}")
-                messages.error(request, f"Could not access Google Sheet. Error: {str(e)}")
-                messages.info(request, "Make sure the sheet is shared with your service account email.")
-                return render(request, 'base/add_google_sheet.html', {'form': form})
-    else:
-        form = GoogleSheetForm()
-    
-    return render(request, 'base/add_google_sheet.html', {'form': form})
-
-@login_required
-@require_http_methods(["GET"])
-def manage_google_sheets(request):
-    """View and manage Google Sheet databases - requires authentication"""
-    # Show only user's sheets (staff can see all)
-    if request.user.is_staff:
-        sheets = GoogleSheetDatabase.objects.all()
-    else:
-        sheets = GoogleSheetDatabase.objects.filter(created_by=request.user)
-    
-    return render(request, 'base/manage_google_sheets.html', {'sheets': sheets})
-
-@login_required
-@require_POST
-@csrf_protect
-def sync_google_sheet(request, sheet_pk):
-    """Sync/refresh candidate count from Google Sheet - requires authentication and ownership"""
-    sheet_db = get_object_or_404(GoogleSheetDatabase, pk=sheet_pk)
-    
-    # Check permission
-    if not check_object_permission(request, sheet_db):
-        logger.warning(f"Unauthorized sync attempt for sheet {sheet_pk} by user {request.user.id}")
-        raise PermissionDenied("You don't have permission to sync this sheet.")
-    
-    try:
-        df = fetch_google_sheet_data(sheet_db.sheet_id)
-        sheet_db.total_candidates = len(df)
-        sheet_db.last_synced = timezone.now()
-        sheet_db.save()
-        
-        logger.info(f"Sheet {sheet_pk} synced successfully by user {request.user.id}")
-        messages.success(request, f"Synced successfully! {sheet_db.total_candidates} candidates found.")
-    except Exception as e:
-        logger.error(f"Sync failed for sheet {sheet_pk} by user {request.user.id}: {str(e)}")
-        messages.error(request, f"Sync failed: {str(e)}")
-    
-    return redirect('manage_google_sheets')
-
-@login_required
 @require_POST
 @csrf_protect
 def match_candidates(request, jd_pk):
-    """Match candidates from Google Sheet with JD requirements - requires authentication and ownership"""
+    """Match candidates from API with JD requirements"""
     jd = get_object_or_404(JobDescription, pk=jd_pk)
     
     # Check permission
@@ -291,75 +215,83 @@ def match_candidates(request, jd_pk):
     
     form = CandidateMatchForm(request.POST)
     
-    if form.is_valid():
-        google_sheet = form.cleaned_data['google_sheet']
-        min_match = form.cleaned_data['min_match_percentage']
-        
-        # Check permission for Google Sheet
-        if not check_object_permission(request, google_sheet) and not google_sheet.is_shared:
-            logger.warning(f"Unauthorized access to sheet {google_sheet.id} by user {request.user.id}")
-            raise PermissionDenied("You don't have permission to use this Google Sheet.")
-        
-        try:
-            # Get required skills from JD
-            required_skills = jd.get_all_skills_list()
-            
-            # Match candidates from Google Sheet
-            matched_candidates = match_candidates_from_google_sheet(
-                google_sheet.sheet_id,
-                required_skills,
-                min_match
-            )
-            
-            if matched_candidates:
-                # Export to Excel (will be deleted after download)
-                output_filename = f"matched_candidates_{jd.title.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-                output_path = Path(settings.MEDIA_ROOT) / 'matched_candidates' / output_filename
-                output_path.parent.mkdir(parents=True, exist_ok=True)
-                
-                export_matched_candidates(matched_candidates, output_path)
-                
-                # Store in session for display (limit to essential data)
-                session_candidates = []
-                for candidate in matched_candidates[:MAX_SESSION_CANDIDATES]:
-                    session_candidates.append({
-                        'name': candidate['name'],
-                        'email': candidate['email'],
-                        'contact': candidate['contact'],
-                        'designation': candidate['designation'],
-                        'current_company': candidate['current_company'],
-                        'experience': candidate['experience'],
-                        'location': candidate['location'],
-                        'linkedin': candidate['linkedin'],
-                        'match_percentage': candidate['match_percentage'],
-                        'matched_skills_count': candidate['matched_skills_count'],
-                        'total_required_skills': candidate['total_required_skills'],
-                        'matched_skills': candidate['matched_skills'][:10],
-                        'cv_link': candidate['cv_link'],
-                    })
-                
-                request.session['matched_candidates'] = session_candidates
-                request.session['output_file'] = str(output_path.relative_to(settings.MEDIA_ROOT))
-                request.session['sheet_name'] = google_sheet.name
-                request.session['total_matches'] = len(matched_candidates)
-                request.session['jd_id'] = jd.pk  # Store JD ID for verification
-                
-                # Cleanup old matched files (older than 1 day)
-                cleanup_old_matched_files(days=1)
-                
-                logger.info(f"Found {len(matched_candidates)} matches for JD {jd_pk} by user {request.user.id}")
-                messages.success(request, f"Found {len(matched_candidates)} matching candidates from {google_sheet.name}!")
-                return redirect('show_matches', jd_pk=jd.pk)
-            else:
-                messages.warning(request, "No candidates found matching the criteria. Try lowering the match percentage.")
-                return redirect('results', pk=jd.pk)
-                
-        except Exception as e:
-            logger.error(f"Error matching candidates for JD {jd_pk} by user {request.user.id}: {str(e)}")
-            messages.error(request, f"An error occurred while matching candidates: {str(e)}")
-            return redirect('results', pk=jd.pk)
+    if not form.is_valid():
+        logger.warning(f"Invalid form submission for JD {jd_pk}: {form.errors}")
+        messages.error(request, "Invalid form data. Please check your inputs.")
+        return redirect('results', pk=jd.pk)
     
-    return redirect('results', pk=jd.pk)
+    # Get form data
+    min_match = form.cleaned_data['min_match_percentage']
+    
+    # Get required skills from JD
+    required_skills = jd.get_all_skills_list()
+    
+    if not required_skills:
+        messages.error(request, "No skills found in the job description.")
+        return redirect('results', pk=jd.pk)
+    
+    try:
+        logger.info(f"Matching candidates for JD {jd_pk} with {len(required_skills)} skills, min_match={min_match}%")
+        
+        # Match candidates from API
+        matched_candidates = match_candidates_with_jd(
+            required_skills=required_skills,
+            min_match_percentage=min_match
+        )
+        
+        if not matched_candidates:
+            logger.info(f"No matches found for JD {jd_pk} with threshold {min_match}%")
+            messages.warning(request, "No candidates found matching the criteria. Try lowering the match percentage.")
+            return redirect('results', pk=jd.pk)
+        
+        # Export to Excel
+        output_filename = f"matched_candidates_{jd.title.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        output_path = Path(settings.MEDIA_ROOT) / 'matched_candidates' / output_filename
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        if not export_matched_candidates(matched_candidates, output_path):
+            messages.error(request, "Failed to export matched candidates.")
+            return redirect('results', pk=jd.pk)
+        
+        # Store in session (limit data for performance)
+        session_candidates = []
+        for candidate in matched_candidates[:MAX_SESSION_CANDIDATES]:
+            session_candidates.append({
+                'id': candidate.get('id', 'N/A'),
+                'name': candidate['name'],
+                'email': candidate['email'],
+                'contact': candidate['contact'],
+                'designation': candidate['designation'],
+                'current_company': candidate.get('current_company', 'N/A'),
+                'experience': candidate['experience'],
+                'location': candidate['location'],
+                'linkedin': candidate['linkedin'],
+                'qualification': candidate.get('qualification', 'N/A'),
+                'match_percentage': candidate['match_percentage'],
+                'matched_skills_count': candidate['matched_skills_count'],
+                'total_required_skills': candidate['total_required_skills'],
+                'matched_skills': candidate['matched_skills'][:15],
+                'cv_link': candidate.get('cv_link', 'N/A'),
+                'status': candidate.get('status', 'Active')
+            })
+        
+        # Store session data
+        request.session['matched_candidates'] = session_candidates
+        request.session['output_file'] = str(output_path.relative_to(settings.MEDIA_ROOT))
+        request.session['total_matches'] = len(matched_candidates)
+        request.session['jd_id'] = jd.pk
+        
+        # Cleanup old files
+        cleanup_old_matched_files(days=1)
+        
+        logger.info(f"Found {len(matched_candidates)} matches for JD {jd_pk}")
+        messages.success(request, f"Found {len(matched_candidates)} matching candidates!")
+        return redirect('show_matches', jd_pk=jd.pk)
+        
+    except Exception as e:
+        logger.error(f"Error matching candidates for JD {jd_pk}: {str(e)}")
+        messages.error(request, f"An error occurred while matching candidates: {str(e)}")
+        return redirect('results', pk=jd.pk)
 
 @login_required
 @require_http_methods(["GET"])
@@ -381,15 +313,27 @@ def show_matches(request, jd_pk):
     
     matched_candidates = request.session.get('matched_candidates', [])
     output_file = request.session.get('output_file', '')
-    sheet_name = request.session.get('sheet_name', 'Google Sheet')
     total_matches = request.session.get('total_matches', len(matched_candidates))
+    match_settings = request.session.get('match_settings', {})
+    
+    # Calculate statistics
+    if matched_candidates:
+        avg_match = sum(c['match_percentage'] for c in matched_candidates) / len(matched_candidates)
+        top_match = max(matched_candidates, key=lambda x: x['match_percentage'])
+    else:
+        avg_match = 0
+        top_match = None
     
     context = {
         'jd': jd,
         'matched_candidates': matched_candidates,
         'output_file': output_file,
-        'sheet_name': sheet_name,
         'total_matches': total_matches,
+        'match_settings': match_settings,
+        'avg_match_percentage': round(avg_match, 1),
+        'top_match': top_match,
+        'displayed_count': len(matched_candidates),
+        'has_more': total_matches > len(matched_candidates),
     }
     
     return render(request, 'base/show_matches.html', context)
@@ -440,6 +384,7 @@ def download_matched_file(request, jd_pk):
         
         # Delete immediately
         os.remove(file_path)
+        logger.info(f"Deleted file after download: {file_path}")
         
         # Serve from memory
         from io import BytesIO
@@ -453,11 +398,36 @@ def download_matched_file(request, jd_pk):
         request.session.pop('matched_candidates', None)
         request.session.pop('output_file', None)
         request.session.pop('jd_id', None)
+        request.session.pop('match_settings', None)
         
         logger.info(f"File downloaded successfully by user {request.user.id} for JD {jd_pk}")
         return response
     
     except Exception as e:
         logger.error(f"Download error for user {request.user.id}: {str(e)}")
-        messages.error(request, f"Error: {str(e)}")
+        messages.error(request, f"Error downloading file: {str(e)}")
         return redirect('show_matches', jd_pk=jd_pk)
+
+@login_required
+@require_http_methods(["GET"])
+def test_api_connection(request):
+    """Test API connection and display candidate count"""
+    try:
+        df = fetch_candidates_from_api()
+        
+        if df.empty:
+            messages.warning(request, "API connection successful but no candidates found.")
+        else:
+            messages.success(request, f"API connection successful! Found {len(df)} candidates.")
+            
+            # Show sample columns
+            if not df.empty:
+                columns = df.columns.tolist()
+                messages.info(request, f"Available columns: {', '.join(columns[:10])}")
+        
+        return redirect('upload_jd')
+        
+    except Exception as e:
+        logger.error(f"API connection test failed: {str(e)}")
+        messages.error(request, f"API connection failed: {str(e)}")
+        return redirect('upload_jd')
