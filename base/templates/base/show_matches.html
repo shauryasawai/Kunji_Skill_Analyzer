@@ -27,14 +27,44 @@
                 <hr>
                 
                 {% if matched_candidates %}
+                <!-- Search and Filter Section -->
+                <div class="card mb-4 bg-light">
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label for="searchName" class="form-label">🔍 Search by Name</label>
+                                <input type="text" class="form-control" id="searchName" placeholder="Enter candidate name...">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="filterLocation" class="form-label">📍 Filter by Location</label>
+                                <input type="text" class="form-control" id="filterLocation" placeholder="Enter location...">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="sortBy" class="form-label">⚡ Sort By</label>
+                                <select class="form-select" id="sortBy">
+                                    <option value="match">Match % (High to Low)</option>
+                                    <option value="location">Location Proximity</option>
+                                    <option value="name">Name (A-Z)</option>
+                                    <option value="experience">Experience</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <button class="btn btn-sm btn-primary" id="applyFilters">Apply Filters</button>
+                            <button class="btn btn-sm btn-outline-secondary" id="resetFilters">Reset</button>
+                            <span class="ms-3 text-muted" id="resultCount">Showing {{ matched_candidates|length }} candidates</span>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="table-responsive">
-                    <table class="table table-hover">
+                    <table class="table table-hover" id="candidatesTable">
                         <thead class="table-dark">
                             <tr>
                                 <th>Match %</th>
                                 <th>Name</th>
                                 <th>Designation</th>
-                                <th>Current Company</th>
+                                <th>Qualifications</th>
                                 <th>Experience</th>
                                 <th>Location</th>
                                 <th>Matched Skills</th>
@@ -43,7 +73,11 @@
                         </thead>
                         <tbody>
                             {% for candidate in matched_candidates %}
-                            <tr>
+                            <tr class="candidate-row" 
+                                data-name="{{ candidate.name|lower }}" 
+                                data-location="{{ candidate.location|lower }}"
+                                data-match="{{ candidate.match_percentage }}"
+                                data-experience="{{ candidate.experience|default:'0' }}">
                                 <td>
                                     <div class="progress" style="width: 60px; height: 30px;">
                                         <div class="progress-bar 
@@ -52,49 +86,59 @@
                                             {% elif candidate.match_percentage >= 40 %}bg-warning
                                             {% else %}bg-secondary{% endif %}"
                                             role="progressbar" 
-                                            style="width: {{ candidate.match_percentage }}%">
+                                            style="width: {{ candidate.match_percentage }}%"
+                                            aria-valuenow="{{ candidate.match_percentage }}"
+                                            aria-valuemin="0"
+                                            aria-valuemax="100">
                                             <strong>{{ candidate.match_percentage }}%</strong>
                                         </div>
                                     </div>
                                     <small class="text-muted">{{ candidate.matched_skills_count }}/{{ candidate.total_required_skills }}</small>
                                 </td>
                                 <td>
-                                    <strong>{{ candidate.name }}</strong>
-                                    {% if candidate.linkedin != 'N/A' %}
-                                        <br><a href="{{ candidate.linkedin }}" target="_blank" class="text-primary">
+                                    <strong>{{ candidate.name|default:"N/A" }}</strong>
+                                    {% if candidate.linkedin and candidate.linkedin != 'N/A' %}
+                                        <br><a href="{{ candidate.linkedin }}" target="_blank" rel="noopener noreferrer" class="text-primary">
                                             <small>🔗 LinkedIn</small>
                                         </a>
                                     {% endif %}
                                 </td>
-                                <td>{{ candidate.designation }}</td>
-                                <td>{{ candidate.current_company }}</td>
-                                <td>{{ candidate.experience }}</td>
-                                <td>{{ candidate.location }}</td>
+                                <td>{{ candidate.designation|default:"N/A" }}</td>
+                                <td>{{ candidate.qualification|default:"N/A" }}</td>
+                                <td>{{ candidate.experience|default:"N/A" }}</td>
+                                <td>
+                                    <span class="location-cell">{{ candidate.location|default:"N/A" }}</span>
+                                </td>
                                 <td>
                                     <button class="btn btn-sm btn-outline-info" 
+                                            type="button"
                                             data-bs-toggle="modal" 
                                             data-bs-target="#skillsModal{{ forloop.counter }}">
                                         View Skills
                                     </button>
                                     
                                     <!-- Modal -->
-                                    <div class="modal fade" id="skillsModal{{ forloop.counter }}" tabindex="-1">
+                                    <div class="modal fade" id="skillsModal{{ forloop.counter }}" tabindex="-1" aria-labelledby="skillsModalLabel{{ forloop.counter }}" aria-hidden="true">
                                         <div class="modal-dialog modal-lg">
                                             <div class="modal-content">
                                                 <div class="modal-header">
-                                                    <h5 class="modal-title">Skills - {{ candidate.name }}</h5>
-                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                    <h5 class="modal-title" id="skillsModalLabel{{ forloop.counter }}">Skills - {{ candidate.name }}</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                                 </div>
                                                 <div class="modal-body">
                                                     <h6>✅ Matched Skills ({{ candidate.matched_skills_count }}):</h6>
                                                     <div class="mb-3">
-                                                        {% for skill in candidate.matched_skills %}
-                                                            <span class="badge bg-success m-1">{{ skill }}</span>
-                                                        {% endfor %}
+                                                        {% if candidate.matched_skills %}
+                                                            {% for skill in candidate.matched_skills %}
+                                                                <span class="badge bg-success m-1">{{ skill }}</span>
+                                                            {% endfor %}
+                                                        {% else %}
+                                                            <p class="text-muted">No matched skills</p>
+                                                        {% endif %}
                                                     </div>
                                                     <hr>
                                                     <h6>📋 All Candidate Skills:</h6>
-                                                    <p>{{ candidate.skills }}</p>
+                                                    <p>{{ candidate.skills|default:"No skills listed" }}</p>
                                                 </div>
                                             </div>
                                         </div>
@@ -102,11 +146,11 @@
                                 </td>
                                 <td>
                                     <small>
-                                        📧 {{ candidate.email }}<br>
-                                        📱 {{ candidate.contact }}
+                                        📧 {{ candidate.email|default:"N/A" }}<br>
+                                        📱 {{ candidate.contact|default:"N/A" }}
                                     </small>
-                                    {% if candidate.cv_link != 'N/A' %}
-                                        <br><a href="{{ candidate.cv_link }}" target="_blank" class="btn btn-xs btn-outline-primary mt-1">
+                                    {% if candidate.cv_link and candidate.cv_link != 'N/A' %}
+                                        <br><a href="{{ candidate.cv_link }}" target="_blank" rel="noopener noreferrer" class="btn btn-xs btn-outline-primary mt-1">
                                             📄 CV
                                         </a>
                                     {% endif %}
@@ -115,6 +159,10 @@
                             {% endfor %}
                         </tbody>
                     </table>
+                </div>
+
+                <div id="noResults" class="alert alert-warning text-center" style="display: none;">
+                    No candidates found matching your search criteria.
                 </div>
                 
                 {% if total_matches > 50 %}
@@ -137,4 +185,169 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchName = document.getElementById('searchName');
+    const filterLocation = document.getElementById('filterLocation');
+    const sortBy = document.getElementById('sortBy');
+    const applyFilters = document.getElementById('applyFilters');
+    const resetFilters = document.getElementById('resetFilters');
+    const resultCount = document.getElementById('resultCount');
+    const noResults = document.getElementById('noResults');
+    const candidateRows = Array.from(document.querySelectorAll('.candidate-row'));
+    const tbody = document.querySelector('#candidatesTable tbody');
+
+    // Location proximity checker
+    function isNearbyLocation(candidateLocation, searchLocation) {
+        if (!searchLocation) return true;
+        
+        candidateLocation = candidateLocation.toLowerCase().trim();
+        searchLocation = searchLocation.toLowerCase().trim();
+        
+        // Exact match
+        if (candidateLocation.includes(searchLocation)) return true;
+        
+        // Split by comma and check each part (city, state, country)
+        const candidateParts = candidateLocation.split(',').map(p => p.trim());
+        const searchParts = searchLocation.split(',').map(p => p.trim());
+        
+        // Check if any part matches
+        for (let searchPart of searchParts) {
+            for (let candidatePart of candidateParts) {
+                if (candidatePart.includes(searchPart) || searchPart.includes(candidatePart)) {
+                    return true;
+                }
+            }
+        }
+        
+        return false;
+    }
+
+    function applyFiltersFunc() {
+        const nameQuery = searchName.value.toLowerCase().trim();
+        const locationQuery = filterLocation.value.toLowerCase().trim();
+        const sortValue = sortBy.value;
+        
+        let visibleRows = candidateRows.filter(row => {
+            const name = row.getAttribute('data-name');
+            const location = row.getAttribute('data-location');
+            
+            const nameMatch = !nameQuery || name.includes(nameQuery);
+            const locationMatch = isNearbyLocation(location, locationQuery);
+            
+            return nameMatch && locationMatch;
+        });
+
+        // Sort the visible rows
+        visibleRows.sort((a, b) => {
+            if (sortValue === 'match') {
+                return parseFloat(b.getAttribute('data-match')) - parseFloat(a.getAttribute('data-match'));
+            } else if (sortValue === 'location') {
+                // Prioritize exact matches, then nearby
+                const locA = a.getAttribute('data-location');
+                const locB = b.getAttribute('data-location');
+                if (locationQuery) {
+                    const exactA = locA.includes(locationQuery) ? 0 : 1;
+                    const exactB = locB.includes(locationQuery) ? 0 : 1;
+                    return exactA - exactB;
+                }
+                return locA.localeCompare(locB);
+            } else if (sortValue === 'name') {
+                return a.getAttribute('data-name').localeCompare(b.getAttribute('data-name'));
+            } else if (sortValue === 'experience') {
+                const expA = parseInt(a.getAttribute('data-experience')) || 0;
+                const expB = parseInt(b.getAttribute('data-experience')) || 0;
+                return expB - expA;
+            }
+            return 0;
+        });
+
+        // Hide all rows first
+        candidateRows.forEach(row => row.style.display = 'none');
+        
+        // Show filtered and sorted rows
+        visibleRows.forEach(row => {
+            tbody.appendChild(row); // Re-append to maintain sort order
+            row.style.display = '';
+        });
+
+        // Update result count and show/hide no results message
+        const visibleCount = visibleRows.length;
+        resultCount.textContent = `Showing ${visibleCount} candidate${visibleCount !== 1 ? 's' : ''}`;
+        
+        if (visibleCount === 0) {
+            noResults.style.display = 'block';
+        } else {
+            noResults.style.display = 'none';
+        }
+
+        // Highlight nearby locations if location filter is active
+        if (locationQuery) {
+            document.querySelectorAll('.location-cell').forEach(cell => {
+                const location = cell.textContent.toLowerCase();
+                if (isNearbyLocation(location, locationQuery)) {
+                    cell.innerHTML = `<span class="badge bg-info">${cell.textContent}</span>`;
+                }
+            });
+        }
+    }
+
+    function resetFiltersFunc() {
+        searchName.value = '';
+        filterLocation.value = '';
+        sortBy.value = 'match';
+        
+        candidateRows.forEach(row => {
+            row.style.display = '';
+            tbody.appendChild(row);
+        });
+        
+        // Remove location highlighting
+        document.querySelectorAll('.location-cell').forEach(cell => {
+            const text = cell.textContent;
+            cell.innerHTML = text;
+        });
+        
+        resultCount.textContent = `Showing ${candidateRows.length} candidate${candidateRows.length !== 1 ? 's' : ''}`;
+        noResults.style.display = 'none';
+    }
+
+    // Event listeners
+    applyFilters.addEventListener('click', applyFiltersFunc);
+    resetFilters.addEventListener('click', resetFiltersFunc);
+    
+    // Real-time search on Enter key
+    searchName.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') applyFiltersFunc();
+    });
+    
+    filterLocation.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') applyFiltersFunc();
+    });
+    
+    sortBy.addEventListener('change', applyFiltersFunc);
+});
+</script>
+
+<style>
+#candidatesTable tbody tr {
+    transition: all 0.3s ease;
+}
+
+.location-cell .badge {
+    font-size: 0.85rem;
+    padding: 0.35em 0.65em;
+}
+
+#noResults {
+    animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+</style>
+
 {% endblock %}
