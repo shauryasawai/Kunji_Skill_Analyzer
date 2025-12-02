@@ -507,7 +507,7 @@ def calculate_experience_score(candidate_exp, required_exp_range=None):
 # ============================================================================
 # MAIN MATCHING ALGORITHM
 # ============================================================================
-def fetch_candidates_from_api(api_url=None, api_key=None, timeout=60):
+def fetch_candidates_from_api(api_url=None, api_key=None, timeout=2000):
     '''Fetch candidate data from API with improved debugging'''
     # Keep the original implementation exactly as is
     try:
