@@ -19,57 +19,8 @@ import numpy as np
 DESIGNATION_CACHE = {}
 SKILL_RELEVANCE_CACHE = {}
 
-SKILL_SYNONYMS = {
-    'javascript': ['js', 'ecmascript', 'node.js', 'nodejs', 'node'],
-    'typescript': ['ts'],
-    'python': ['py'],
-    'aws': ['amazon web services', 'amazon aws'],
-    'gcp': ['google cloud platform', 'google cloud'],
-    'azure': ['microsoft azure', 'ms azure'],
-    'react': ['reactjs', 'react.js'],
-    'angular': ['angularjs', 'angular.js'],
-    'vue': ['vuejs', 'vue.js'],
-    'postgresql': ['postgres', 'psql'],
-    'mongodb': ['mongo'],
-    'mysql': ['my sql'],
-    'rest api': ['restful api', 'rest', 'restful', 'rest apis'],
-    'graphql': ['graph ql'],
-    'docker': ['containerization'],
-    'kubernetes': ['k8s'],
-    'machine learning': ['ml'],
-    'artificial intelligence': ['ai'],
-    'natural language processing': ['nlp'],
-    'ci/cd': ['continuous integration', 'continuous deployment', 'cicd'],
-    'agile': ['scrum', 'kanban'],
-    'sql': ['structured query language'],
-    'nosql': ['no sql'],
-    'html': ['html5'],
-    'css': ['css3'],
-    'figma': ['figma design', 'figma prototyping'],
-    'sketch': ['sketch app'],
-    'adobe xd': ['xd', 'adobe experience design'],
-    'ui design': ['user interface design', 'ui/ux design', 'interface design'],
-    'ux design': ['user experience design', 'ui/ux design', 'ux research'],
-    'wireframing': ['wireframes', 'mockups'],
-    'prototyping': ['interactive prototypes', 'clickable prototypes'],
-    'user research': ['ux research', 'user testing', 'usability testing'],
-    'interaction design': ['ixd', 'interaction designer'],
-    'visual design': ['graphic design', 'ui design'],
-    'design systems': ['component libraries', 'design tokens'],
-    'adobe photoshop': ['photoshop', 'ps'],
-    'adobe illustrator': ['illustrator', 'ai'],
-    'invision': ['invision studio', 'invision app'],
-    'zeplin': ['zeplin.io'],
-    'principle': ['principle for mac'],
-    'framer': ['framer motion', 'framer x'],
-}
 
-# Build reverse lookup
-SKILL_CANONICAL = {}
-for canonical, synonyms in SKILL_SYNONYMS.items():
-    SKILL_CANONICAL[canonical] = canonical
-    for syn in synonyms:
-        SKILL_CANONICAL[syn] = canonical
+
 
 GENERIC_SOFT_SKILLS = {
     "communication", "leadership", "teamwork", "problem solving", 
@@ -80,26 +31,6 @@ GENERIC_SOFT_SKILLS = {
 # ============================================================================
 # CORE UTILITY FUNCTIONS
 # ============================================================================
-
-def normalize_skill(skill):
-    '''Normalize skill to canonical form'''
-    skill = skill.lower().strip()
-    skill = re.sub(r'[^\w\s\.\-\+\#]', ' ', skill)
-    skill = ' '.join(skill.split())
-    
-    return SKILL_CANONICAL.get(skill, skill)
-
-def extract_skill_versions(skill):
-    '''Extract version numbers from skills'''
-    version_pattern = r'(\d+(?:\.\d+)*(?:\.[xX])?)'
-    match = re.search(version_pattern, skill)
-    
-    if match:
-        base_skill = re.sub(version_pattern, '', skill).strip()
-        version = match.group(1)
-        return base_skill, version
-    
-    return skill, None
 
 def parse_experience_years(exp_str):
     '''Extract numeric years from experience string'''
@@ -439,65 +370,108 @@ def fallback_designation_matching(jd_role, cand_desg, use_cache, cache_key):
 # ============================================================================
 # SKILL MATCHING ENGINE
 # ============================================================================
-
 def calculate_skill_similarity(req_skill, cand_skill, use_fuzzy=True):
-    '''Calculate similarity score between two skills (0-100) - LENIENT VERSION'''
-    # Normalize both skills
+    '''Direct exact matching only - 100 or 0'''
     req_norm = normalize_skill(req_skill)
     cand_norm = normalize_skill(cand_skill)
     
-    # Extract versions if present
-    req_base, req_version = extract_skill_versions(req_norm)
-    cand_base, cand_version = extract_skill_versions(cand_norm)
-    
-    # 1. Exact match (canonical forms)
+    # Exact match only
     if req_norm == cand_norm:
-        return 100, "exact", {"matched": "canonical exact match"}
+        return 100, "exact", {"matched": "exact match"}
     
-    # 2. Base skill match with version consideration
-    if req_base == cand_base:
-        if req_version and cand_version:
-            if req_version.split('.')[0] == cand_version.split('.')[0]:
-                return 95, "version_match", {"req_version": req_version, "cand_version": cand_version}
-            else:
-                return 85, "version_mismatch", {"req_version": req_version, "cand_version": cand_version}
-        return 100, "exact", {"matched": "base skill exact"}
-    
-    # 3. One contains the other (substring) - MORE LENIENT
+    # Optional: Substring match for compound skills
     if req_norm in cand_norm or cand_norm in req_norm:
-        return 85, "substring", {"direction": "contains"}
+        return 85, "substring", {"matched": "partial match"}
     
-    # 4. Check if any words match (e.g., "react native" matches "react")
-    req_words = set(req_norm.split())
-    cand_words = set(cand_norm.split())
-    common_words = req_words & cand_words
+    return 0, "no_match", {}
+
+def normalize_skill(skill):
+    '''
+    Enhanced normalization for better matching
+    - Lowercase
+    - Remove special characters (/,-,etc.)
+    - Collapse multiple spaces
+    - Strip whitespace
+    '''
+    if not skill:
+        return ""
     
-    if common_words:
-        # If they share significant words, give high score
-        for word in common_words:
-            if len(word) >= 4:  # Meaningful word
-                return 75, "word_match", {"word": word}
+    skill = str(skill).lower().strip()
     
-    # 5. Fuzzy matching - LOWERED THRESHOLDS
-    if use_fuzzy:
-        token_sort = fuzz.token_sort_ratio(req_norm, cand_norm)
-        partial = fuzz.partial_ratio(req_norm, cand_norm)
-        token_set = fuzz.token_set_ratio(req_norm, cand_norm)
+    # Remove special characters but keep spaces
+    skill = re.sub(r'[^\w\s]', ' ', skill)
+    
+    # Collapse multiple spaces
+    skill = ' '.join(skill.split())
+    
+    return skill
+
+def skill_tokens(skill):
+    '''Extract meaningful word tokens from skill (2+ chars)'''
+    normalized = normalize_skill(skill)
+    return {word for word in normalized.split() if len(word) >= 2}
+
+def extract_skill_versions(skill):
+    '''Extract version numbers from skills'''
+    version_pattern = r'(\d+(?:\.\d+)*(?:\.[xX])?)'
+    match = re.search(version_pattern, skill)
+    
+    if match:
+        base_skill = re.sub(version_pattern, '', skill).strip()
+        version = match.group(1)
+        return base_skill, version
+    
+    return skill, None
+
+def calculate_skill_similarity(req_skill, cand_skill, use_fuzzy=True):
+    '''
+    Smart skill matching with multiple strategies:
+    1. Exact match (100)
+    2. Substring match (85)
+    3. Token overlap match (70)
+    4. No match (0)
+    '''
+    req_norm = normalize_skill(req_skill)
+    cand_norm = normalize_skill(cand_skill)
+    
+    if not req_norm or not cand_norm:
+        return 0, "no_match", {}
+    
+    # Strategy 1: Exact match
+    if req_norm == cand_norm:
+        return 100, "exact", {"matched": "exact match"}
+    
+    # Strategy 2: Substring match (one contains the other)
+    if req_norm in cand_norm or cand_norm in req_norm:
+        return 85, "substring", {"matched": "substring match"}
+    
+    # Strategy 3: Token overlap match
+    # (e.g., "ui ux design" matches "ui design" or "ux")
+    req_tokens = skill_tokens(req_skill)
+    cand_tokens = skill_tokens(cand_skill)
+    
+    if req_tokens and cand_tokens:
+        common_tokens = req_tokens & cand_tokens
         
-        best_fuzzy = max(token_sort, partial, token_set)
-        
-        # LOWERED from 85 to 70
-        if best_fuzzy >= 70:
-            score = 50 + ((best_fuzzy - 70) * 1.67)
-            return score, "fuzzy_high", {"similarity": best_fuzzy}
-        # LOWERED from 75 to 60
-        elif best_fuzzy >= 60:
-            score = 40 + ((best_fuzzy - 60) * 1)
-            return score, "fuzzy_medium", {"similarity": best_fuzzy}
-        # NEW: Added lower tier
-        elif best_fuzzy >= 50:
-            score = 30 + ((best_fuzzy - 50) * 1)
-            return score, "fuzzy_low", {"similarity": best_fuzzy}
+        if common_tokens:
+            # Calculate overlap percentage
+            overlap_ratio = len(common_tokens) / min(len(req_tokens), len(cand_tokens))
+            
+            if overlap_ratio >= 0.8:  # 80%+ overlap
+                return 75, "high_token_overlap", {
+                    "common_tokens": list(common_tokens),
+                    "overlap": f"{overlap_ratio:.0%}"
+                }
+            elif overlap_ratio >= 0.5:  # 50%+ overlap
+                return 65, "medium_token_overlap", {
+                    "common_tokens": list(common_tokens),
+                    "overlap": f"{overlap_ratio:.0%}"
+                }
+            elif len(common_tokens) >= 1 and len(list(common_tokens)[0]) >= 4:
+                # At least one meaningful word (4+ chars) matches
+                return 55, "partial_token_match", {
+                    "common_tokens": list(common_tokens)
+                }
     
     return 0, "no_match", {}
 
@@ -620,16 +594,16 @@ def fetch_candidates_from_api(api_url=None, api_key=None, timeout=60):
         traceback.print_exc()
         return pd.DataFrame()
     
-def match_candidates_with_jd(required_skills=['all_skills'], min_match_percentage=52, api_url=None, api_key=None,  # 52 instead of 60
+def match_candidates_with_jd(required_skills=['all_skills'], min_match_percentage=15, api_url=None, api_key=None,  # ULTRA LOW: 15
                              priority_skills=None, nice_to_have_skills=None, use_fuzzy=True, 
                              location_preference=None, required_experience=None,
                              min_required_skills_match=None,
                              industry_preference=None, 
-                             min_quality_threshold=25,  # 25 instead of 40
+                             min_quality_threshold=5,  # ULTRA LOW: 5
                              jd_role_title=None,
-                             debug_mode=True): # NEW: Added debug mode
+                             debug_mode=True):
     '''
-    VERY LENIENT VERSION: Will show candidates with even 2-3 skill matches
+    ULTRA LENIENT VERSION: Will show candidates with even 1 skill match
     '''
     try:
         df = fetch_candidates_from_api(api_url, api_key)
@@ -653,14 +627,14 @@ def match_candidates_with_jd(required_skills=['all_skills'], min_match_percentag
             print("❌ No valid required skills")
             return []
         
-        # VERY LENIENT minimum calculation
+        # ULTRA LENIENT: Accept even 1 skill match
         if min_required_skills_match is None:
-            min_req_skills = max(2, len(required_skills_lower) // 10)  # Just 10% of skills
+            min_req_skills = 1  # CHANGED: Always accept 1+ skills
         else:
-            min_req_skills = min_required_skills_match
+            min_req_skills = max(1, min_required_skills_match)  # CHANGED: Minimum is 1
         
         print(f"🎯 Required skills: {len(required_skills_lower)}")
-        print(f"🎯 Minimum skills to match: {min_req_skills} (VERY LENIENT)")
+        print(f"🎯 Minimum skills to match: {min_req_skills} (ULTRA LENIENT - accepting 1+ skills)")
         
         if debug_mode:
             print(f"🔍 DEBUG: First 10 required skills: {required_skills_lower[:10]}")
@@ -690,72 +664,32 @@ def match_candidates_with_jd(required_skills=['all_skills'], min_match_percentag
         import traceback
         traceback.print_exc()
         return []
-    
-def debug_skill_matching(required_skills, candidate_skills_sample):
-    '''Debug helper to see how skills are being normalized and matched'''
-    print("\n🔍 SKILL MATCHING DEBUG")
-    print("=" * 60)
-    
-    print("\n📋 Required Skills (after normalization):")
-    for skill in required_skills[:10]:
-        normalized = normalize_skill(skill)
-        print(f"   '{skill}' → '{normalized}'")
-    
-    print("\n📋 Sample Candidate Skills (after normalization):")
-    for skill in candidate_skills_sample[:10]:
-        normalized = normalize_skill(skill)
-        print(f"   '{skill}' → '{normalized}'")
-    
-    print("\n🎯 Testing Matches:")
-    for req in required_skills[:5]:
-        print(f"\n   Looking for: '{req}'")
-        for cand in candidate_skills_sample[:10]:
-            score, match_type, details = calculate_skill_similarity(req, cand)
-            if score > 0:
-                print(f"      ✓ Matched '{cand}' (score: {score}, type: {match_type})")
-    
-    print("\n" + "=" * 60)
 
 def calculate_min_required_skills(jd_role_title, required_skills, min_override):
-    '''Calculate minimum required skills based on role type - BALANCED VERSION'''
+    '''Calculate minimum required skills - ULTRA LENIENT: Always 1'''
     if min_override is not None:
-        return min_override
+        return max(1, min_override)  # CHANGED: Never less than 1
     
-    jd = (jd_role_title or "").lower()
-    total_skills = len(required_skills)
-    
-    # BALANCED THRESHOLDS - require reasonable skill matches
-    if any(w in jd for w in ["developer", "engineer", "architect", "devops", "data"]):
-        # Technical roles: require 25-30% of skills
-        return max(3, min(7, int(total_skills * 0.28)))
-    elif any(w in jd for w in ["designer", "ui", "ux", "creative"]):
-        # Design roles: require 25% of skills
-        return max(3, min(6, int(total_skills * 0.25)))
-    else:
-        # Other roles: require 20-25% of skills
-        return max(2, min(5, int(total_skills * 0.22)))
+    # CHANGED: Always return 1 for ultra-lenient matching
+    return 1
 
 def process_candidate(row, required_skills, priority_skills, nice_to_have_skills,
                      jd_role_title, min_req_skills, min_quality_threshold, 
                      min_match_percentage, location_preference, required_experience, filtered_count):
-    '''Process a single candidate and return match data if qualified - BALANCED VERSION'''
+    '''Process a single candidate - ULTRA LENIENT VERSION'''
     candidate_skills_str = str(row.get('skills', ''))
     
     if not candidate_skills_str or candidate_skills_str.lower() in ['nan', 'none', '']:
         return None
     
-    # Designation filter - BALANCED
-    candidate_designation = str(row.get('designation', ''))
-    if not is_designation_relevant(jd_role_title, candidate_designation):
-        filtered_count['designation'] += 1
-        return None
+    # REMOVED: Designation filter - accept all designations
     
     # Parse and filter candidate skills
     candidate_skills = parse_candidate_skills(candidate_skills_str)
     if not candidate_skills:
         return None
     
-    # Skill matching with BALANCED thresholds
+    # Skill matching with ULTRA LOW thresholds
     matched_details, total_weighted_score, total_weight, nice_to_have_matched = match_skills(
         candidate_skills, required_skills, priority_skills, nice_to_have_skills, jd_role_title
     )
@@ -766,19 +700,17 @@ def process_candidate(row, required_skills, priority_skills, nice_to_have_skills
     if required_matched > 0:
         print(f"   Candidate: {row.get('name', 'Unknown')} - Matched {required_matched}/{len(required_skills)} skills")
     
+    # CHANGED: Accept if ANY skill matches
     if required_matched < min_req_skills:
         filtered_count['min_skills'] += 1
         return None
     
-    # BALANCED skill relevance threshold - 38 (between 25 and 45)
+    # REMOVED: Skill relevance threshold - accept all candidates with any match
+    candidate_designation = str(row.get('designation', ''))
     matched_skills = list(matched_details.keys())
     skill_relevance_score = calculate_skill_relevance_score(
         matched_skills, jd_role_title, candidate_designation
     )
-    
-    if skill_relevance_score < 38:  # BALANCED threshold
-        filtered_count['skill_relevance'] += 1
-        return None
     
     # Calculate scores
     candidate_scores = calculate_candidate_scores(
@@ -788,13 +720,14 @@ def process_candidate(row, required_skills, priority_skills, nice_to_have_skills
         required_experience, priority_skills, nice_to_have_matched, nice_to_have_skills
     )
     
-    # BALANCED quality threshold - 25 (between 10 and 35)
-    effective_quality_threshold = max(min_quality_threshold, 25)
+    # CHANGED: Ultra low quality threshold of 5
+    effective_quality_threshold = max(min_quality_threshold, 5)
     
     if candidate_scores['quality_score'] < effective_quality_threshold:
         filtered_count['quality'] += 1
         return None
     
+    # CHANGED: Ultra low match percentage threshold
     if candidate_scores['combined_score'] < min_match_percentage:
         filtered_count['threshold'] += 1
         return None
@@ -804,118 +737,185 @@ def process_candidate(row, required_skills, priority_skills, nice_to_have_skills
                                required_skills, priority_skills, nice_to_have_matched)
 
 def is_candidate_designation_relevant(jd_role_title, candidate_designation):
-    '''Check if candidate designation is relevant to JD role - VERY LENIENT'''
-    if not jd_role_title or not candidate_designation:
-        return True  # If no data, allow through
-    
-    # SIMPLIFIED: Just check if they share ANY keyword
-    role_keywords = generate_role_keyword_profile(jd_role_title)
-    cand_lower = candidate_designation.lower()
-    
-    # If they share even ONE keyword, consider relevant
-    if any(k in cand_lower for k in role_keywords):
-        return True
-    
-    # Also allow if candidate has related terms
-    related_terms = {
-        'engineer': ['developer', 'architect', 'programmer', 'coder'],
-        'developer': ['engineer', 'architect', 'programmer', 'coder'],
-        'designer': ['creative', 'artist', 'ui', 'ux', 'visual'],
-        'manager': ['lead', 'head', 'director', 'supervisor'],
-        'analyst': ['researcher', 'specialist', 'consultant']
-    }
-    
-    for term, synonyms in related_terms.items():
-        if term in jd_role_title.lower():
-            if any(syn in cand_lower for syn in synonyms):
-                return True
-    
-    # BE VERY LENIENT - allow through by default
-    return True  # CHANGED: Default to True instead of False
+    '''ULTRA LENIENT: Always return True - accept all designations'''
+    return True
 
 def parse_candidate_skills(skills_str):
-    '''Parse and filter candidate skills'''
+    '''Parse and filter candidate skills - MORE LENIENT'''
     candidate_skills_raw = re.split(r'[,;|\n]', skills_str)
     candidate_skills = [normalize_skill(s) for s in candidate_skills_raw if s.strip()]
     
-    # Filter out generic soft skills and short skills
+    # CHANGED: More lenient filtering - only remove very short skills
     return [
         s for s in candidate_skills 
-        if normalize_skill(s) not in GENERIC_SOFT_SKILLS and len(s) > 3
+        if len(s) > 2  # CHANGED: Accept 3+ character skills (was 4+)
     ]
 
 def match_skills(candidate_skills, required_skills, priority_skills, nice_to_have_skills, jd_role_title):
-    '''Match candidate skills against required, priority, and nice-to-have skills - BALANCED VERSION'''
+    '''
+    Match candidate skills with SMART MATCHING
+    - Accepts scores >= 55 (partial matches)
+    - Uses token-based matching for multi-word skills
+    '''
     matched_details = {}
     total_weighted_score = 0
     total_weight = 0
     
-    # BALANCED threshold - 42 (between 30 and 55)
-    base_threshold = 42
+    # Normalize candidate skills once
+    candidate_skills_normalized = [normalize_skill(s) for s in candidate_skills]
     
-    # Match required skills
+    print(f"🔍 Matching {len(required_skills)} JD skills against {len(candidate_skills_normalized)} candidate skills")
+    
+    # LOWERED THRESHOLD: Accept scores >= 55 (was 100 in exact matching)
+    MATCH_THRESHOLD = 55
+    
+    # ========================================================================
+    # 1. MATCH REQUIRED SKILLS (Weight: 1.0)
+    # ========================================================================
+    print(f"\n📋 Checking {len(required_skills)} required skills...")
+    
     for req_skill in required_skills:
-        best_score, best_match = find_best_skill_match(req_skill, candidate_skills, jd_role_title)
+        best_score = 0
+        best_match = None
+        best_cand_skill = None
         
-        if best_score >= base_threshold:
+        # Find best match among all candidate skills
+        for i, cand_skill in enumerate(candidate_skills):
+            score, match_type, details = calculate_skill_similarity(req_skill, cand_skill, True)
+            
+            if score > best_score:
+                best_score = score
+                best_match = {'type': match_type, 'details': details}
+                best_cand_skill = cand_skill
+        
+        if best_score >= MATCH_THRESHOLD:
             matched_details[req_skill] = {
                 'score': best_score,
                 'weight': 1.0,
                 'category': 'required',
+                'cand_skill': best_cand_skill,
                 **best_match
             }
             total_weighted_score += best_score * 1.0
+            
+            # Show match type
+            if best_score == 100:
+                print(f"   ✅ {req_skill} → {best_cand_skill}")
+            elif best_score >= 80:
+                print(f"   ⚡ {req_skill} ≈ {best_cand_skill} ({best_score})")
+            else:
+                print(f"   💡 {req_skill} ~ {best_cand_skill} ({best_score})")
+        else:
+            print(f"   ❌ {req_skill}")
+        
         total_weight += 1.0
     
-    # Match priority skills
-    for pri_skill in priority_skills:
-        if pri_skill in matched_details:
-            matched_details[pri_skill]['weight'] = 2.0
-            matched_details[pri_skill]['category'] = 'priority'
-            total_weighted_score += matched_details[pri_skill]['score']
-            total_weight += 1.0
-        else:
-            best_score, best_match = find_best_skill_match(pri_skill, candidate_skills, jd_role_title)
-            if best_score >= base_threshold:
+    # ========================================================================
+    # 2. MATCH PRIORITY SKILLS (Weight: 2.0)
+    # ========================================================================
+    if priority_skills:
+        print(f"\n⭐ Checking {len(priority_skills)} priority skills...")
+        
+        for pri_skill in priority_skills:
+            # Upgrade if already matched
+            if pri_skill in matched_details:
+                matched_details[pri_skill]['weight'] = 2.0
+                matched_details[pri_skill]['category'] = 'priority'
+                total_weighted_score += matched_details[pri_skill]['score'] * 1.0
+                total_weight += 1.0
+                print(f"   ⭐ Upgraded: {pri_skill}")
+                continue
+            
+            # Find best match
+            best_score = 0
+            best_match = None
+            best_cand_skill = None
+            
+            for cand_skill in candidate_skills:
+                score, match_type, details = calculate_skill_similarity(pri_skill, cand_skill, True)
+                if score > best_score:
+                    best_score = score
+                    best_match = {'type': match_type, 'details': details}
+                    best_cand_skill = cand_skill
+            
+            if best_score >= MATCH_THRESHOLD:
                 matched_details[pri_skill] = {
                     'score': best_score,
                     'weight': 2.0,
                     'category': 'priority',
+                    'cand_skill': best_cand_skill,
                     **best_match
                 }
                 total_weighted_score += best_score * 2.0
-            total_weight += 2.0
+                total_weight += 2.0
+                print(f"   ✅ Priority: {pri_skill} → {best_cand_skill} ({best_score})")
+            else:
+                total_weight += 2.0
+                print(f"   ❌ Priority: {pri_skill}")
     
-    # Match nice-to-have skills
+    # ========================================================================
+    # 3. MATCH NICE-TO-HAVE SKILLS (Weight: 0.5)
+    # ========================================================================
     nice_to_have_matched = 0
-    for nice_skill in nice_to_have_skills:
-        if nice_skill not in matched_details:
-            best_score, best_match = find_best_skill_match(nice_skill, candidate_skills, jd_role_title)
-            if best_score >= base_threshold:
+    
+    if nice_to_have_skills:
+        print(f"\n💡 Checking {len(nice_to_have_skills)} nice-to-have skills...")
+        
+        for nice_skill in nice_to_have_skills:
+            if nice_skill in matched_details:
+                continue
+            
+            best_score = 0
+            best_match = None
+            best_cand_skill = None
+            
+            for cand_skill in candidate_skills:
+                score, match_type, details = calculate_skill_similarity(nice_skill, cand_skill, True)
+                if score > best_score:
+                    best_score = score
+                    best_match = {'type': match_type, 'details': details}
+                    best_cand_skill = cand_skill
+            
+            if best_score >= MATCH_THRESHOLD:
                 matched_details[nice_skill] = {
                     'score': best_score,
                     'weight': 0.5,
                     'category': 'nice_to_have',
+                    'cand_skill': best_cand_skill,
                     **best_match
                 }
                 nice_to_have_matched += 1
                 total_weighted_score += best_score * 0.5
+                print(f"   ✅ Bonus: {nice_skill} → {best_cand_skill}")
+    
+    # ========================================================================
+    # SUMMARY
+    # ========================================================================
+    required_matched = sum(1 for d in matched_details.values() if d['category'] in ['required', 'priority'])
+    
+    print(f"\n📊 Match Summary:")
+    print(f"   Required/Priority: {required_matched}/{len(required_skills) + len(priority_skills or [])}")
+    print(f"   Nice-to-have: {nice_to_have_matched}/{len(nice_to_have_skills or [])}")
+    print(f"   Total matched: {len(matched_details)}")
+    print(f"   Weighted score: {total_weighted_score:.1f}/{total_weight:.1f}")
     
     return matched_details, total_weighted_score, total_weight, nice_to_have_matched
 
 def find_best_skill_match(target_skill, candidate_skills, jd_role_title):
-    '''Find the best match for a target skill among candidate skills'''
-    best_score = 0
-    best_match = None
+    '''Find exact match only'''
+    target_norm = normalize_skill(target_skill)
     
     for cand_skill in candidate_skills:
-        score, match_type, details = calculate_skill_similarity(target_skill, cand_skill, True)
-        if score > best_score:
-            best_score = score
-            best_match = {'type': match_type, 'cand_skill': cand_skill, 'details': details}
-            if best_match is None:
-                best_match = {}
-    return best_score, best_match
+        cand_norm = normalize_skill(cand_skill)
+        
+        if target_norm == cand_norm:
+            return 100, {'type': 'exact', 'cand_skill': cand_skill, 'details': {}}
+        
+        # Optional: substring match
+        if target_norm in cand_norm or cand_norm in target_norm:
+            return 85, {'type': 'substring', 'cand_skill': cand_skill, 'details': {}}
+    
+    return 0, None
 
 def calculate_candidate_scores(matched_details, required_skills, required_matched, 
                               total_weighted_score, total_weight, skill_relevance_score,
@@ -925,8 +925,8 @@ def calculate_candidate_scores(matched_details, required_skills, required_matche
     base_match_pct = (required_matched / len(required_skills)) * 100 if required_skills else 0
     quality_score = (total_weighted_score / total_weight) if total_weight > 0 else 0
     
-    # Apply skill relevance multiplier
-    relevance_multiplier = max(0.7, skill_relevance_score / 100)
+    # CHANGED: More lenient relevance multiplier (minimum 0.85 instead of 0.7)
+    relevance_multiplier = max(0.85, skill_relevance_score / 100)
     quality_score = quality_score * relevance_multiplier
     
     # Combined score
@@ -965,14 +965,14 @@ def calculate_bonuses(jd_role_title, candidate_designation, skill_relevance_scor
             desg_bonus = (designation_score / 100) * 15
             bonuses['designation'] = round(desg_bonus, 1)
     
-    # Skill relevance bonus
-    if skill_relevance_score >= 70:
-        relevance_bonus = ((skill_relevance_score - 70) / 30) * 10
+    # CHANGED: Lower threshold for skill relevance bonus (50 instead of 70)
+    if skill_relevance_score >= 50:
+        relevance_bonus = ((skill_relevance_score - 50) / 50) * 10
         bonuses['skill_relevance'] = round(relevance_bonus, 1)
     
     # Priority skills bonus
     if priority_skills:
-        priority_matched = sum(1 for s in priority_skills if s in [k for k in row.keys()])  # Simplified
+        priority_matched = sum(1 for s in priority_skills if s in [k for k in row.keys()])
         priority_pct = (priority_matched / len(priority_skills))
         priority_bonus = priority_pct * 15
         bonuses['priority'] = round(priority_bonus, 1)
@@ -1067,7 +1067,7 @@ def finalize_results(matched_candidates, filtered_count, total_candidates, min_m
     print(f"   Total candidates: {total_candidates}")
     for filter_type, count in filtered_count.items():
         print(f"   Filtered by {filter_type}: {count}")
-    print(f"\n✅ Found {len(matched_candidates)} matching candidates")
+    print(f"\n✅ Found {len(matched_candidates)} matching candidates (Ultra-Lenient Mode)")
     
     if matched_candidates:
         print(f"\n🏆 Top 10 Candidates:")
@@ -1082,9 +1082,34 @@ def finalize_results(matched_candidates, filtered_count, total_candidates, min_m
             if len(c['matched_skills']) > 8:
                 print(f"          ... and {len(c['matched_skills']) - 8} more")
     else:
-        print(f"\n⚠️ No candidates found. Try lowering thresholds.")
+        print(f"\n⚠️ No candidates found with even 1 matching skill.")
     
     return matched_candidates
+
+def debug_skill_matching(required_skills, candidate_skills_sample):
+    '''Debug helper to see how skills are being normalized and matched'''
+    print("\n🔍 SKILL MATCHING DEBUG")
+    print("=" * 60)
+    
+    print("\n📋 Required Skills (after normalization):")
+    for skill in required_skills[:10]:
+        normalized = normalize_skill(skill)
+        print(f"   '{skill}' → '{normalized}'")
+    
+    print("\n📋 Sample Candidate Skills (after normalization):")
+    for skill in candidate_skills_sample[:10]:
+        normalized = normalize_skill(skill)
+        print(f"   '{skill}' → '{normalized}'")
+    
+    print("\n🎯 Testing Matches:")
+    for req in required_skills[:5]:
+        print(f"\n   Looking for: '{req}'")
+        for cand in candidate_skills_sample[:10]:
+            score, match_type, details = calculate_skill_similarity(req, cand)
+            if score > 0:
+                print(f"      ✓ Matched '{cand}' (score: {score}, type: {match_type})")
+    
+    print("\n" + "=" * 60)
 
 # ============================================================================
 # SUPPORTING FUNCTIONS (keep as is from original)
@@ -1240,64 +1265,7 @@ def cleanup_old_matched_files(days=1):
     if deleted_count > 0:
         print(f"✅ Cleanup complete: {deleted_count} old files deleted")
 
-def load_skills_map():
-    '''Load skills mapping from JSON file or return default'''
-    try:
-        if settings.SKILLS_MAP_PATH.exists():
-            with open(settings.SKILLS_MAP_PATH, 'r', encoding='utf-8') as f:
-                content = f.read().strip()
-                if not content:
-                    print("⚠️ Skills map file is empty, using default")
-                    return get_default_skills_map()
-                return json.loads(content)
-        else:
-            print("⚠️ Skills map file not found, using default")
-            return get_default_skills_map()
-    except (json.JSONDecodeError, FileNotFoundError) as e:
-        print(f"⚠️ Error loading skills map: {e}, using default")
-        return get_default_skills_map()
 
-def get_default_skills_map():
-    '''Return comprehensive default skills mapping'''
-    return {
-        "Docker": ["Kubernetes", "AWS ECS", "Containerization", "Docker Compose", "CI/CD"],
-        "Python": ["Django", "Flask", "FastAPI", "NumPy", "Pandas", "Data Science"],
-        "JavaScript": ["React", "Node.js", "TypeScript", "Vue.js", "Angular"],
-        "Recruitment": ["Talent Acquisition", "Interviewing", "Onboarding", "ATS", "Sourcing"],
-        "Marketing": ["SEO", "Content Strategy", "Campaign Management", "Google Analytics", "Social Media"],
-        "Finance": ["Budgeting", "Forecasting", "Financial Modelling", "Excel", "Accounting"],
-        "SQL": ["Database Design", "PostgreSQL", "MySQL", "Data Analysis", "Query Optimization"],
-        "Project Management": ["Agile", "Scrum", "JIRA", "Stakeholder Management", "Risk Management"],
-        "Sales": ["CRM", "Lead Generation", "Negotiation", "Account Management", "Pipeline Management"],
-        "HR": ["Employee Relations", "Performance Management", "HRMS", "Compliance", "Training"],
-        "Java": ["Spring Boot", "Hibernate", "Maven", "JUnit", "Microservices"],
-        "AWS": ["EC2", "S3", "Lambda", "CloudFormation", "RDS"],
-        "Data Analysis": ["Excel", "Tableau", "Power BI", "Statistics", "SQL"],
-        "Content Writing": ["Copywriting", "SEO Writing", "Editing", "Blogging", "Content Strategy"],
-        "Customer Service": ["Communication", "Problem Solving", "CRM", "Ticketing Systems", "Customer Support"],
-        "Machine Learning": ["TensorFlow", "PyTorch", "Scikit-learn", "Deep Learning", "NLP"],
-        "DevOps": ["Jenkins", "Docker", "Kubernetes", "Terraform", "Monitoring"],
-        "UI/UX": ["Figma", "Adobe XD", "Wireframing", "Prototyping", "User Research"],
-        "Product Management": ["Roadmap Planning", "User Stories", "Product Strategy", "Analytics", "Stakeholder Management"]
-    }
-
-def expand_skills_with_map(primary_skills, secondary_skills):
-    '''Expand secondary skills based on primary skills using skills map'''
-    skills_map = load_skills_map()
-    expanded_secondary = set(secondary_skills) if secondary_skills else set()
-    
-    for skill in primary_skills:
-        # Check exact match
-        if skill in skills_map:
-            expanded_secondary.update(skills_map[skill])
-        # Check case-insensitive match
-        else:
-            for map_skill, related in skills_map.items():
-                if skill.lower() == map_skill.lower():
-                    expanded_secondary.update(related)
-                    break
-    
-    return list(expanded_secondary)
 
 def delete_file_after_delay(file_path, delay_seconds=5):
     '''Delete a file after delay in background thread'''
