@@ -11,7 +11,7 @@ from .forms import JDUploadForm, CandidateMatchForm
 from .models import JobDescription
 from .utils import (cleanup_old_matched_files, extract_text_from_file, extract_skills_from_jd, save_jd_to_excel, 
                     generate_linkedin_search_strings, match_candidates_with_jd,
-                    export_matched_candidates, fetch_candidates_from_api)
+                    export_matched_candidates, fetch_candidates_from_api,fetch_candidates_from_api_initial)
 from datetime import datetime
 from django.conf import settings
 from django.utils import timezone
@@ -179,7 +179,7 @@ def results(request, pk):
     total_candidates = 0
     if api_available:
         try:
-            df = fetch_candidates_from_api()
+            df = fetch_candidates_from_api_initial()
             total_candidates = len(df) if not df.empty else 0
         except Exception as e:
             logger.warning(f"Failed to fetch candidate count: {str(e)}")
@@ -414,6 +414,31 @@ def test_api_connection(request):
     """Test API connection and display candidate count"""
     try:
         df = fetch_candidates_from_api()
+        
+        if df.empty:
+            messages.warning(request, "API connection successful but no candidates found.")
+        else:
+            messages.success(request, f"API connection successful! Found {len(df)} candidates.")
+            
+            # Show sample columns
+            if not df.empty:
+                columns = df.columns.tolist()
+                messages.info(request, f"Available columns: {', '.join(columns[:10])}")
+        
+        return redirect('upload_jd')
+        
+    except Exception as e:
+        logger.error(f"API connection test failed: {str(e)}")
+        messages.error(request, f"API connection failed: {str(e)}")
+        return redirect('upload_jd')
+    
+
+@login_required
+@require_http_methods(["GET"])
+def test_api_connection_init(request):
+    """Test API connection and display candidate count"""
+    try:
+        df = fetch_candidates_from_api_initial()
         
         if df.empty:
             messages.warning(request, "API connection successful but no candidates found.")

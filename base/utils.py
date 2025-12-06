@@ -507,6 +507,93 @@ def calculate_experience_score(candidate_exp, required_exp_range=None):
 # ============================================================================
 # MAIN MATCHING ALGORITHM
 # ============================================================================
+def fetch_candidates_from_api_initial(api_url=None, api_key=None, timeout=2000):
+    '''Fetch candidate data from API with improved debugging'''
+    # Keep the original implementation exactly as is
+    try:
+        if api_url is None:
+            api_url = getattr(settings, 'CANDIDATES_API_URL_INIT', None)
+        if api_key is None:
+            api_key = getattr(settings, 'CANDIDATES_API_KEY', None)
+        
+        if not api_url:
+            print("❌ Error: CANDIDATES_API_URL not configured in settings")
+            return pd.DataFrame()
+        
+        headers = {'Content-Type': 'application/json'}
+        if api_key:
+            headers['Authorization'] = f'Bearer {api_key}'
+        
+        print(f"🔄 Fetching candidates from API: {api_url}")
+        response = requests.get(api_url, headers=headers, timeout=timeout)
+        response.raise_for_status()
+        
+        data = response.json()
+        print(f"📦 API Response type: {type(data)}")
+        
+        # Handle different API response structures
+        if isinstance(data, dict):
+            print(f"📦 Response keys: {list(data.keys())}")
+            
+            if 'cols' in data and 'data' in data:
+                print(f"✅ Using columnar format (cols + data)")
+                df = pd.DataFrame(data['data'], columns=data['cols'])
+                print(f"✅ Successfully fetched {len(df)} candidates from API")
+                return normalize_candidate_dataframe(df)
+            elif 'cols' in data and 'rows' in data:
+                print(f"✅ Using columnar format (cols + rows)")
+                df = pd.DataFrame(data['rows'], columns=data['cols'])
+                print(f"✅ Successfully fetched {len(df)} candidates from API")
+                return normalize_candidate_dataframe(df)
+            elif 'data' in data:
+                candidates = data['data']
+                print(f"✅ Using 'data' key from response")
+            elif 'candidates' in data:
+                candidates = data['candidates']
+                print(f"✅ Using 'candidates' key from response")
+            elif 'results' in data:
+                candidates = data['results']
+                print(f"✅ Using 'results' key from response")
+            else:
+                candidates = data
+                print(f"⚠️ Using entire response as data")
+        elif isinstance(data, list):
+            candidates = data
+            print(f"✅ Response is a list with {len(data)} items")
+        else:
+            print(f"❌ Unexpected API response format: {type(data)}")
+            return pd.DataFrame()
+        
+        if not candidates:
+            print("⚠️ No candidates found in API response")
+            return pd.DataFrame()
+        
+        if not isinstance(candidates, list):
+            print(f"⚠️ Candidates is not a list, type: {type(candidates)}")
+            return pd.DataFrame()
+        
+        print(f"📊 Creating DataFrame from {len(candidates)} candidates")
+        df = pd.DataFrame(candidates)
+        df = normalize_candidate_dataframe(df)
+        
+        print(f"✅ Successfully fetched {len(df)} candidates from API")
+        return df
+    
+    except requests.exceptions.Timeout:
+        print(f"❌ API request timed out after {timeout} seconds")
+        return pd.DataFrame()
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Error fetching candidates from API: {e}")
+        return pd.DataFrame()
+    except json.JSONDecodeError as e:
+        print(f"❌ Error parsing API response JSON: {e}")
+        return pd.DataFrame()
+    except Exception as e:
+        print(f"❌ Unexpected error fetching candidates: {e}")
+        import traceback
+        traceback.print_exc()
+        return pd.DataFrame()
+    
 def fetch_candidates_from_api(api_url=None, api_key=None, timeout=2000):
     '''Fetch candidate data from API with improved debugging'''
     # Keep the original implementation exactly as is

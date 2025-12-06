@@ -216,6 +216,7 @@ import os
 
 load_dotenv()
 CANDIDATES_API_URL = os.getenv("CANDIDATES_API_URL", "")
+CANDIDATES_API_URL_INIT = os.getenv("CANDIDATES_API_URL_INIT", "")
 
 # # Logging Configuration
 # LOGGING = {
