@@ -338,10 +338,11 @@ def show_matches(request, jd_pk):
     
     return render(request, 'base/show_matches.html', context)
 
+from io import BytesIO
 @login_required
 @require_http_methods(["GET"])
 def download_matched_file(request, jd_pk):
-    """Download matched candidates file - requires authentication and ownership"""
+    """Download matched candidates file - Vercel compatible (no filesystem persistence)"""
     jd = get_object_or_404(JobDescription, pk=jd_pk)
     
     # Check permission
@@ -360,15 +361,30 @@ def download_matched_file(request, jd_pk):
     if not output_file:
         raise Http404("File not found")
     
-    file_path = Path(settings.MEDIA_ROOT) / output_file
+    # Determine file location based on environment
+    is_vercel = os.getenv('VERCEL') == '1' or os.getenv('VERCEL_ENV') is not None
+    
+    if is_vercel:
+        # On Vercel, use /tmp directory (only writable location)
+        file_path = Path('/tmp') / Path(output_file).name
+    else:
+        # Local development: use MEDIA_ROOT
+        file_path = Path(settings.MEDIA_ROOT) / output_file
     
     # Validate file path to prevent directory traversal
     try:
         file_path = file_path.resolve()
-        media_root = Path(settings.MEDIA_ROOT).resolve()
-        if not str(file_path).startswith(str(media_root)):
-            logger.error(f"Directory traversal attempt by user {request.user.id}: {file_path}")
-            raise PermissionDenied("Invalid file path")
+        
+        if is_vercel:
+            tmp_root = Path('/tmp').resolve()
+            if not str(file_path).startswith(str(tmp_root)):
+                logger.error(f"Directory traversal attempt by user {request.user.id}: {file_path}")
+                raise PermissionDenied("Invalid file path")
+        else:
+            media_root = Path(settings.MEDIA_ROOT).resolve()
+            if not str(file_path).startswith(str(media_root)):
+                logger.error(f"Directory traversal attempt by user {request.user.id}: {file_path}")
+                raise PermissionDenied("Invalid file path")
     except Exception as e:
         logger.error(f"File path validation error: {str(e)}")
         raise Http404("Invalid file path")
@@ -382,19 +398,24 @@ def download_matched_file(request, jd_pk):
         with open(file_path, 'rb') as f:
             file_data = f.read()
         
-        # Delete immediately
-        os.remove(file_path)
-        logger.info(f"Deleted file after download: {file_path}")
+        # Delete file immediately (cleanup)
+        try:
+            os.remove(file_path)
+            logger.info(f"Deleted file after download: {file_path}")
+        except Exception as del_error:
+            logger.warning(f"Could not delete file {file_path}: {del_error}")
         
         # Serve from memory
-        from io import BytesIO
         response = FileResponse(
             BytesIO(file_data),
             content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
-        response['Content-Disposition'] = f'attachment; filename="{file_path.name}"'
         
-        # Clear session
+        # Use safe filename from path
+        safe_filename = file_path.name
+        response['Content-Disposition'] = f'attachment; filename="{safe_filename}"'
+        
+        # Clear session data
         request.session.pop('matched_candidates', None)
         request.session.pop('output_file', None)
         request.session.pop('jd_id', None)
