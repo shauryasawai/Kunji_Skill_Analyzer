@@ -11,6 +11,14 @@ import requests
 from fuzzywuzzy import fuzz
 from collections import defaultdict, Counter
 import numpy as np
+from io import BytesIO
+import base64
+import openpyxl
+from openpyxl.styles import PatternFill, Font, Alignment
+from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
 
 # ============================================================================
 # CACHES AND CONSTANTS
@@ -1286,48 +1294,75 @@ def save_jd_to_excel(jd_data):
     except Exception as e:
         print(f"❌ Error saving JD data to Excel: {e}")
 
-def export_matched_candidates(matched_candidates, output_path):
-    '''
-    Export matched candidates to Excel
+def export_matched_candidates(request, matched_candidates, jd_pk=None):
+    """
+    Export matched candidates to Excel and store in Django session (Vercel compatible)
     
     Args:
-        matched_candidates: List of matched candidate dictionaries
-        output_path: Path where Excel file will be saved
+        request: Django request object
+        matched_candidates: List of candidate dictionaries
+        jd_pk: (Optional) job description ID for filename reference
     
     Returns:
-        Boolean indicating success
-    '''
+        tuple: (success: bool, message: str)
+    """
     try:
         if not matched_candidates:
-            print("⚠️ No candidates to export")
-            return False
-        
-        df = pd.DataFrame(matched_candidates)
-        
-        # Reorder columns for better readability
-        column_order = [
-            'match_percentage', 'quality_score', 'matched_skills_count', 'total_required_skills',
-            'exact_matches', 'priority_matches', 'name', 'email', 'contact', 
-            'designation', 'current_company', 'experience', 'location', 
-            'qualification', 'linkedin', 'skills', 'matched_skills', 
-            'cv_link', 'status', 'id'
-        ]
-        
-        # Only include columns that exist
-        column_order = [col for col in column_order if col in df.columns]
-        df = df[column_order]
-        
-        # Ensure output directory exists
-        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-        
-        # Export to Excel
-        df.to_excel(output_path, index=False, engine='openpyxl')
-        print(f"✅ Matched candidates exported to: {output_path}")
-        return True
-    
+            return False, "No candidates available to export."
+
+        # Create workbook
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Matched Candidates"
+
+        # Define headers dynamically from available keys
+        dynamic_headers = list(matched_candidates[0].keys())
+
+        # Format header
+        header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
+        header_font = Font(bold=True, color="FFFFFF")
+
+        for col_num, header in enumerate(dynamic_headers, 1):
+            cell = ws.cell(row=1, column=col_num, value=header.replace("_", " ").title())
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+
+        # Add row data
+        for row_index, candidate in enumerate(matched_candidates, start=2):
+            for col_index, key in enumerate(dynamic_headers, start=1):
+                ws.cell(row=row_index, column=col_index, value=candidate.get(key, "N/A"))
+
+        # Auto-adjust column widths
+        for column_cells in ws.columns:
+            max_length = max(len(str(cell.value)) if cell.value else 0 for cell in column_cells)
+            ws.column_dimensions[column_cells[0].column_letter].width = min(max_length + 2, 50)
+
+        # Save in memory buffer
+        buffer = BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+
+        # Convert to base64 for session storage
+        file_b64 = base64.b64encode(buffer.read()).decode("utf-8")
+
+        # Create filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"matched_candidates_{jd_pk or 'export'}_{timestamp}.xlsx"
+
+        # Store in session
+        request.session["excel_file_data"] = file_b64
+        request.session["excel_filename"] = filename
+        request.session["matched_candidates_export"] = matched_candidates
+
+        logger.info(f"Excel export stored in session for job {jd_pk or 'N/A'}")
+
+        return True, "Excel export generated and stored successfully!"
+
     except Exception as e:
-        print(f"❌ Error exporting matched candidates: {e}")
-        return False
+        logger.error(f"Error exporting candidates: {str(e)}")
+        return False, f"Error exporting candidates: {str(e)}"
+
     
 def cleanup_old_matched_files(days=1):
     '''Delete matched candidate files older than specified days'''

@@ -19,7 +19,7 @@ import json
 import os
 from pathlib import Path
 import logging
-
+import base64
 # Configure logging
 logger = logging.getLogger(__name__)
 
@@ -342,7 +342,7 @@ from io import BytesIO
 @login_required
 @require_http_methods(["GET"])
 def download_matched_file(request, jd_pk):
-    """Download matched candidates file - Vercel compatible (no filesystem persistence)"""
+    """Download matched candidates file - Vercel compatible (session-based storage)"""
     jd = get_object_or_404(JobDescription, pk=jd_pk)
     
     # Check permission
@@ -356,67 +356,29 @@ def download_matched_file(request, jd_pk):
         logger.warning(f"Session JD mismatch for download by user {request.user.id}")
         raise Http404("File not found or session expired")
     
-    output_file = request.session.get('output_file', '')
+    # Get file data from session (base64 encoded)
+    file_data_b64 = request.session.get('excel_file_data')
+    filename = request.session.get('excel_filename', 'matched_candidates.xlsx')
     
-    if not output_file:
-        raise Http404("File not found")
-    
-    # Determine file location based on environment
-    is_vercel = os.getenv('VERCEL') == '1' or os.getenv('VERCEL_ENV') is not None
-    
-    if is_vercel:
-        # On Vercel, use /tmp directory (only writable location)
-        file_path = Path('/tmp') / Path(output_file).name
-    else:
-        # Local development: use MEDIA_ROOT
-        file_path = Path(settings.MEDIA_ROOT) / output_file
-    
-    # Validate file path to prevent directory traversal
-    try:
-        file_path = file_path.resolve()
-        
-        if is_vercel:
-            tmp_root = Path('/tmp').resolve()
-            if not str(file_path).startswith(str(tmp_root)):
-                logger.error(f"Directory traversal attempt by user {request.user.id}: {file_path}")
-                raise PermissionDenied("Invalid file path")
-        else:
-            media_root = Path(settings.MEDIA_ROOT).resolve()
-            if not str(file_path).startswith(str(media_root)):
-                logger.error(f"Directory traversal attempt by user {request.user.id}: {file_path}")
-                raise PermissionDenied("Invalid file path")
-    except Exception as e:
-        logger.error(f"File path validation error: {str(e)}")
-        raise Http404("Invalid file path")
-    
-    if not file_path.exists():
-        logger.warning(f"File not found for download: {file_path}")
-        raise Http404("File not found")
+    if not file_data_b64:
+        logger.warning(f"No file data in session for JD {jd_pk}")
+        raise Http404("File not found or session expired")
     
     try:
-        # Read file into memory
-        with open(file_path, 'rb') as f:
-            file_data = f.read()
-        
-        # Delete file immediately (cleanup)
-        try:
-            os.remove(file_path)
-            logger.info(f"Deleted file after download: {file_path}")
-        except Exception as del_error:
-            logger.warning(f"Could not delete file {file_path}: {del_error}")
+        # Decode base64 file data
+        file_data = base64.b64decode(file_data_b64)
         
         # Serve from memory
         response = FileResponse(
             BytesIO(file_data),
             content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
         
-        # Use safe filename from path
-        safe_filename = file_path.name
-        response['Content-Disposition'] = f'attachment; filename="{safe_filename}"'
-        
-        # Clear session data
+        # Clear session data after successful download
         request.session.pop('matched_candidates', None)
+        request.session.pop('excel_file_data', None)
+        request.session.pop('excel_filename', None)
         request.session.pop('output_file', None)
         request.session.pop('jd_id', None)
         request.session.pop('match_settings', None)
@@ -424,6 +386,10 @@ def download_matched_file(request, jd_pk):
         logger.info(f"File downloaded successfully by user {request.user.id} for JD {jd_pk}")
         return response
     
+    except base64.binascii.Error as e:
+        logger.error(f"Base64 decode error for user {request.user.id}: {str(e)}")
+        messages.error(request, "File data is corrupted. Please regenerate the matches.")
+        return redirect('show_matches', jd_pk=jd_pk)
     except Exception as e:
         logger.error(f"Download error for user {request.user.id}: {str(e)}")
         messages.error(request, f"Error downloading file: {str(e)}")
