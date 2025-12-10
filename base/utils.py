@@ -1297,160 +1297,70 @@ def save_jd_to_excel(jd_data):
 def export_matched_candidates(request, matched_candidates, jd_pk=None):
     """
     Export matched candidates to Excel and store in Django session (Vercel compatible)
-    OPTIMIZED: Handles large datasets, prevents timeouts
+    
+    Args:
+        request: Django request object
+        matched_candidates: List of candidate dictionaries
+        jd_pk: (Optional) job description ID for filename reference
+    
+    Returns:
+        tuple: (success: bool, message: str)
     """
     try:
         if not matched_candidates:
             return False, "No candidates available to export."
 
-        print(f"📊 Starting export for {len(matched_candidates)} candidates...")
-
-        # Create workbook with write-only mode for better memory efficiency
-        wb = openpyxl.Workbook(write_only=False)  # Keep False for formatting
+        # Create workbook
+        wb = openpyxl.Workbook()
         ws = wb.active
         ws.title = "Matched Candidates"
 
-        # OPTIMIZED: Define essential columns only (reduce Excel size)
-        essential_columns = [
-            'name', 'email', 'contact', 'designation', 'current_company',
-            'experience', 'location', 'linkedin', 'qualification',
-            'match_percentage', 'matched_skills_count', 'total_required_skills',
-            'matched_skills', 'cv_link', 'status'
-        ]
+        # Define headers dynamically from available keys
+        dynamic_headers = list(matched_candidates[0].keys())
 
         # Format header
         header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
         header_font = Font(bold=True, color="FFFFFF")
 
-        # Write headers
-        for col_num, header in enumerate(essential_columns, 1):
+        for col_num, header in enumerate(dynamic_headers, 1):
             cell = ws.cell(row=1, column=col_num, value=header.replace("_", " ").title())
             cell.fill = header_fill
             cell.font = header_font
             cell.alignment = Alignment(horizontal="center", vertical="center")
 
-        print(f"✅ Headers written")
-
-        # OPTIMIZED: Write rows in batches to prevent memory issues
+        # Add row data
         for row_index, candidate in enumerate(matched_candidates, start=2):
-            for col_index, key in enumerate(essential_columns, start=1):
-                value = candidate.get(key, "N/A")
-                
-                # Handle complex types efficiently
-                if key == 'matched_skills':
-                    if isinstance(value, list):
-                        # Limit to first 20 skills to reduce size
-                        value = ', '.join(str(s) for s in value[:20])
-                    elif not isinstance(value, str):
-                        value = str(value)
-                elif isinstance(value, (dict, list)):
-                    value = str(value)[:500]  # Truncate long values
-                elif value is None:
-                    value = "N/A"
-                
-                ws.cell(row=row_index, column=col_index, value=value)
-            
-            # Progress indicator every 50 rows
-            if row_index % 50 == 0:
-                print(f"   Processed {row_index - 1} candidates...")
+            for col_index, key in enumerate(dynamic_headers, start=1):
+                ws.cell(row=row_index, column=col_index, value=candidate.get(key, "N/A"))
 
-        print(f"✅ All {len(matched_candidates)} candidates written to Excel")
+        # Auto-adjust column widths
+        for column_cells in ws.columns:
+            max_length = max(len(str(cell.value)) if cell.value else 0 for cell in column_cells)
+            ws.column_dimensions[column_cells[0].column_letter].width = min(max_length + 2, 50)
 
-        # OPTIMIZED: Auto-adjust column widths (with limits)
-        for column in ws.columns:
-            max_length = 0
-            column_letter = None
-            
-            for cell in column:
-                if cell.value:
-                    max_length = max(max_length, len(str(cell.value)))
-                if column_letter is None:
-                    column_letter = cell.column_letter
-            
-            if column_letter:
-                # Set width between 10 and 50
-                adjusted_width = min(max(max_length + 2, 10), 50)
-                ws.column_dimensions[column_letter].width = adjusted_width
-
-        print(f"✅ Column widths adjusted")
-
-        # Save to memory buffer
+        # Save in memory buffer
         buffer = BytesIO()
         wb.save(buffer)
         buffer.seek(0)
-        
-        excel_bytes = buffer.read()
-        excel_size_mb = len(excel_bytes) / (1024 * 1024)
-        print(f"📦 Excel file size: {excel_size_mb:.2f} MB")
-
-        # CRITICAL: Check if file is too large for session storage
-        if excel_size_mb > 5:  # 5MB limit for session storage
-            logger.warning(f"Excel file too large ({excel_size_mb:.2f}MB), storing limited data")
-            # Store only top 100 candidates if file is too large
-            return export_matched_candidates(request, matched_candidates[:100], jd_pk)
 
         # Convert to base64 for session storage
-        file_b64 = base64.b64encode(excel_bytes).decode("utf-8")
-        print(f"✅ Base64 encoding complete ({len(file_b64)} chars)")
+        file_b64 = base64.b64encode(buffer.read()).decode("utf-8")
 
         # Create filename
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"matched_candidates_{jd_pk or 'export'}_{timestamp}.xlsx"
 
-        # OPTIMIZED: Store minimal candidate data in session
-        session_candidates = []
-        for candidate in matched_candidates[:100]:  # Limit to 100
-            # Only store displayable fields
-            session_candidate = {
-                'id': str(candidate.get('id', 'N/A')),
-                'name': str(candidate.get('name', 'N/A')),
-                'email': str(candidate.get('email', 'N/A')),
-                'contact': str(candidate.get('contact', 'N/A')),
-                'designation': str(candidate.get('designation', 'N/A')),
-                'current_company': str(candidate.get('current_company', 'N/A')),
-                'experience': str(candidate.get('experience', 'N/A')),
-                'location': str(candidate.get('location', 'N/A')),
-                'linkedin': str(candidate.get('linkedin', 'N/A')),
-                'qualification': str(candidate.get('qualification', 'N/A')),
-                'match_percentage': float(candidate.get('match_percentage', 0)),
-                'matched_skills_count': int(candidate.get('matched_skills_count', 0)),
-                'total_required_skills': int(candidate.get('total_required_skills', 0)),
-                'matched_skills': candidate.get('matched_skills', [])[:10],  # First 10 only
-                'cv_link': str(candidate.get('cv_link', 'N/A')),
-                'status': str(candidate.get('status', 'Active'))
-            }
-            session_candidates.append(session_candidate)
-
-        print(f"✅ Session data prepared ({len(session_candidates)} candidates)")
-
-        # Store in session with error handling
-        try:
-            request.session["excel_file_data"] = file_b64
-            request.session["excel_filename"] = filename
-            request.session["matched_candidates_export"] = session_candidates
-            request.session["total_matches"] = len(matched_candidates)
-            request.session.modified = True  # Force session save
-            
-            print(f"✅ Session data stored successfully")
-        except Exception as session_error:
-            logger.error(f"Session storage error: {str(session_error)}")
-            # Fallback: try with even less data
-            request.session["excel_file_data"] = file_b64
-            request.session["excel_filename"] = filename
-            request.session["matched_candidates_export"] = session_candidates[:50]
-            request.session["total_matches"] = len(matched_candidates)
-            request.session.modified = True
-            print(f"⚠️ Stored reduced session data (50 candidates)")
+        # Store in session
+        request.session["excel_file_data"] = file_b64
+        request.session["excel_filename"] = filename
+        request.session["matched_candidates_export"] = matched_candidates
 
         logger.info(f"Excel export stored in session for job {jd_pk or 'N/A'}")
-        print(f"✅ Export complete!")
 
         return True, "Excel export generated and stored successfully!"
 
     except Exception as e:
         logger.error(f"Error exporting candidates: {str(e)}")
-        import traceback
-        traceback.print_exc()
         return False, f"Error exporting candidates: {str(e)}"
 
     
@@ -1702,5 +1612,3 @@ def get_default_error_response():
         "qualifications": [],
         "preferred_location": None
     }
-
-# All other functions remain exactly as in the original code...
