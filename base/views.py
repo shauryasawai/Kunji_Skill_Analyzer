@@ -205,7 +205,7 @@ def results(request, pk):
 @require_POST
 @csrf_protect
 def match_candidates(request, jd_pk):
-    """Match candidates from API with JD requirements"""
+    """Match candidates from API with JD requirements - Vercel optimized"""
     jd = get_object_or_404(JobDescription, pk=jd_pk)
     
     # Check permission
@@ -220,10 +220,7 @@ def match_candidates(request, jd_pk):
         messages.error(request, "Invalid form data. Please check your inputs.")
         return redirect('results', pk=jd.pk)
     
-    # Get form data
     min_match = form.cleaned_data['min_match_percentage']
-    
-    # Get required skills from JD
     required_skills = jd.get_all_skills_list()
     
     if not required_skills:
@@ -231,18 +228,30 @@ def match_candidates(request, jd_pk):
         return redirect('results', pk=jd.pk)
     
     try:
-        logger.info(f"Matching candidates for JD {jd_pk} with {len(required_skills)} skills, min_match={min_match}%")
+        logger.info(f"Matching candidates for JD {jd_pk}")
         
-        # Match candidates from API
+        # SIMPLIFIED: Reduce skills if too many (prevent timeout)
+        max_skills = 15
+        if len(required_skills) > max_skills:
+            required_skills = required_skills[:max_skills]
+            messages.info(request, f"Using top {max_skills} skills for matching.")
+        
+        # Match candidates
         matched_candidates = match_candidates_with_jd(
             required_skills=required_skills,
-            min_match_percentage=min_match
+            min_match_percentage=min_match,
+            jd_role_title=jd.title,
+            debug_mode=False  # Critical: disable debug prints
         )
         
         if not matched_candidates:
-            logger.info(f"No matches found for JD {jd_pk} with threshold {min_match}%")
-            messages.warning(request, "No candidates found matching the criteria. Try lowering the match percentage.")
+            messages.warning(request, "No candidates found. Try lowering the match percentage.")
             return redirect('results', pk=jd.pk)
+        
+        # CRITICAL: Limit results to 300 max
+        if len(matched_candidates) > 300:
+            matched_candidates = matched_candidates[:300]
+            messages.info(request, "Showing top 300 matches.")
         
         # Export to Excel
         success, message = export_matched_candidates(request, matched_candidates, jd_pk=jd.pk)
@@ -251,22 +260,17 @@ def match_candidates(request, jd_pk):
             messages.error(request, message)
             return redirect('results', pk=jd.pk)
         
-        # Session data already stored by export_matched_candidates
         request.session['total_matches'] = len(matched_candidates)
         request.session['jd_id'] = jd.pk
         
-        # Cleanup old files
-        cleanup_old_matched_files(days=1)
-        
-        logger.info(f"Found {len(matched_candidates)} matches for JD {jd_pk}")
         messages.success(request, f"Found {len(matched_candidates)} matching candidates!")
         return redirect('show_matches', jd_pk=jd.pk)
         
     except Exception as e:
-        logger.error(f"Error matching candidates for JD {jd_pk}: {str(e)}")
-        messages.error(request, f"An error occurred while matching candidates: {str(e)}")
+        logger.error(f"Error: {str(e)}")
+        messages.error(request, f"Error occurred. Please try again.")
         return redirect('results', pk=jd.pk)
-
+    
 @login_required
 @require_http_methods(["GET"])
 def show_matches(request, jd_pk):
