@@ -1297,14 +1297,6 @@ def save_jd_to_excel(jd_data):
 def export_matched_candidates(request, matched_candidates, jd_pk=None):
     """
     Export matched candidates to Excel and store in Django session (Vercel compatible)
-    
-    Args:
-        request: Django request object
-        matched_candidates: List of candidate dictionaries
-        jd_pk: (Optional) job description ID for filename reference
-    
-    Returns:
-        tuple: (success: bool, message: str)
     """
     try:
         if not matched_candidates:
@@ -1315,8 +1307,26 @@ def export_matched_candidates(request, matched_candidates, jd_pk=None):
         ws = wb.active
         ws.title = "Matched Candidates"
 
+        # CHANGED: Prepare candidates for export - convert complex types to strings
+        export_candidates = []
+        for candidate in matched_candidates:
+            export_candidate = candidate.copy()
+            
+            # Convert lists to comma-separated strings for Excel
+            if isinstance(export_candidate.get('matched_skills'), list):
+                export_candidate['matched_skills'] = ', '.join(export_candidate['matched_skills'])
+            
+            # Convert dict to JSON string for Excel
+            if isinstance(export_candidate.get('skill_match_details'), dict):
+                export_candidate['skill_match_details'] = json.dumps(export_candidate['skill_match_details'])
+            
+            if isinstance(export_candidate.get('bonuses'), dict):
+                export_candidate['bonuses'] = json.dumps(export_candidate['bonuses'])
+            
+            export_candidates.append(export_candidate)
+
         # Define headers dynamically from available keys
-        dynamic_headers = list(matched_candidates[0].keys())
+        dynamic_headers = list(export_candidates[0].keys())
 
         # Format header
         header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
@@ -1329,9 +1339,13 @@ def export_matched_candidates(request, matched_candidates, jd_pk=None):
             cell.alignment = Alignment(horizontal="center", vertical="center")
 
         # Add row data
-        for row_index, candidate in enumerate(matched_candidates, start=2):
+        for row_index, candidate in enumerate(export_candidates, start=2):
             for col_index, key in enumerate(dynamic_headers, start=1):
-                ws.cell(row=row_index, column=col_index, value=candidate.get(key, "N/A"))
+                value = candidate.get(key, "N/A")
+                # Handle any remaining complex types
+                if isinstance(value, (dict, list)):
+                    value = str(value)
+                ws.cell(row=row_index, column=col_index, value=value)
 
         # Auto-adjust column widths
         for column_cells in ws.columns:
@@ -1350,10 +1364,33 @@ def export_matched_candidates(request, matched_candidates, jd_pk=None):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"matched_candidates_{jd_pk or 'export'}_{timestamp}.xlsx"
 
+        # CHANGED: Store simplified candidate data in session (avoid serialization issues)
+        session_candidates = []
+        for candidate in matched_candidates[:100]:  # Limit to 100 for session storage
+            session_candidate = {
+                'id': candidate.get('id', 'N/A'),
+                'name': candidate.get('name', 'N/A'),
+                'email': candidate.get('email', 'N/A'),
+                'contact': candidate.get('contact', 'N/A'),
+                'designation': candidate.get('designation', 'N/A'),
+                'current_company': candidate.get('current_company', 'N/A'),
+                'experience': candidate.get('experience', 'N/A'),
+                'location': candidate.get('location', 'N/A'),
+                'linkedin': candidate.get('linkedin', 'N/A'),
+                'qualification': candidate.get('qualification', 'N/A'),
+                'match_percentage': candidate.get('match_percentage', 0),
+                'matched_skills_count': candidate.get('matched_skills_count', 0),
+                'total_required_skills': candidate.get('total_required_skills', 0),
+                'matched_skills': candidate.get('matched_skills', [])[:25],  # Limit skills list
+                'cv_link': candidate.get('cv_link', 'N/A'),
+                'status': candidate.get('status', 'Active')
+            }
+            session_candidates.append(session_candidate)
+
         # Store in session
         request.session["excel_file_data"] = file_b64
         request.session["excel_filename"] = filename
-        request.session["matched_candidates_export"] = matched_candidates
+        request.session["matched_candidates_export"] = session_candidates
 
         logger.info(f"Excel export stored in session for job {jd_pk or 'N/A'}")
 
@@ -1361,6 +1398,8 @@ def export_matched_candidates(request, matched_candidates, jd_pk=None):
 
     except Exception as e:
         logger.error(f"Error exporting candidates: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return False, f"Error exporting candidates: {str(e)}"
 
     

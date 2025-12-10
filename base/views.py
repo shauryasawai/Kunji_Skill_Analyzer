@@ -245,39 +245,13 @@ def match_candidates(request, jd_pk):
             return redirect('results', pk=jd.pk)
         
         # Export to Excel
-        output_filename = f"matched_candidates_{jd.title.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-        output_path = Path(settings.MEDIA_ROOT) / 'matched_candidates' / output_filename
-        output_path.parent.mkdir(parents=True, exist_ok=True)
+        success, message = export_matched_candidates(request, matched_candidates, jd_pk=jd.pk)
         
-        if not export_matched_candidates(matched_candidates, output_path):
-            messages.error(request, "Failed to export matched candidates.")
+        if not success:
+            messages.error(request, message)
             return redirect('results', pk=jd.pk)
         
-        # Store in session (limit data for performance)
-        session_candidates = []
-        for candidate in matched_candidates[:MAX_SESSION_CANDIDATES]:
-            session_candidates.append({
-                'id': candidate.get('id', 'N/A'),
-                'name': candidate['name'],
-                'email': candidate['email'],
-                'contact': candidate['contact'],
-                'designation': candidate['designation'],
-                'current_company': candidate.get('current_company', 'N/A'),
-                'experience': candidate['experience'],
-                'location': candidate['location'],
-                'linkedin': candidate['linkedin'],
-                'qualification': candidate.get('qualification', 'N/A'),
-                'match_percentage': candidate['match_percentage'],
-                'matched_skills_count': candidate['matched_skills_count'],
-                'total_required_skills': candidate['total_required_skills'],
-                'matched_skills': candidate['matched_skills'][:15],
-                'cv_link': candidate.get('cv_link', 'N/A'),
-                'status': candidate.get('status', 'Active')
-            })
-        
-        # Store session data
-        request.session['matched_candidates'] = session_candidates
-        request.session['output_file'] = str(output_path.relative_to(settings.MEDIA_ROOT))
+        # Session data already stored by export_matched_candidates
         request.session['total_matches'] = len(matched_candidates)
         request.session['jd_id'] = jd.pk
         
@@ -311,7 +285,7 @@ def show_matches(request, jd_pk):
         messages.error(request, "Invalid session data. Please run the match again.")
         return redirect('results', pk=jd_pk)
     
-    matched_candidates = request.session.get('matched_candidates', [])
+    matched_candidates = request.session.get('matched_candidates_export', [])
     output_file = request.session.get('output_file', '')
     total_matches = request.session.get('total_matches', len(matched_candidates))
     match_settings = request.session.get('match_settings', {})
