@@ -1299,7 +1299,7 @@ def export_matched_candidates(request, matched_candidates, jd_pk=None):
     Export matched candidates to Excel and store in Django session (Vercel compatible)
     
     Args:
-        request: Django request object
+        request: Django request object (REQUIRED for session storage)
         matched_candidates: List of candidate dictionaries
         jd_pk: (Optional) job description ID for filename reference
     
@@ -1315,54 +1315,101 @@ def export_matched_candidates(request, matched_candidates, jd_pk=None):
         ws = wb.active
         ws.title = "Matched Candidates"
 
-        # Define headers dynamically from available keys
-        dynamic_headers = list(matched_candidates[0].keys())
+        # Define headers - order matters for readability
+        priority_headers = [
+            'name', 'email', 'contact', 'designation', 'current_company',
+            'experience', 'location', 'match_percentage', 'matched_skills_count',
+            'total_required_skills', 'matched_skills', 'quality_score',
+            'skill_relevance_score', 'linkedin', 'cv_link'
+        ]
+        
+        # Get all unique keys from candidates
+        all_keys = set()
+        for candidate in matched_candidates:
+            all_keys.update(candidate.keys())
+        
+        # Arrange headers: priority first, then others
+        headers = []
+        for h in priority_headers:
+            if h in all_keys:
+                headers.append(h)
+        
+        # Add remaining headers
+        for key in sorted(all_keys):
+            if key not in headers:
+                headers.append(key)
 
-        # Format header
+        # Format header row
         header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
         header_font = Font(bold=True, color="FFFFFF")
 
-        for col_num, header in enumerate(dynamic_headers, 1):
+        for col_num, header in enumerate(headers, 1):
             cell = ws.cell(row=1, column=col_num, value=header.replace("_", " ").title())
             cell.fill = header_fill
             cell.font = header_font
             cell.alignment = Alignment(horizontal="center", vertical="center")
 
-        # Add row data
+        # Add candidate data rows
         for row_index, candidate in enumerate(matched_candidates, start=2):
-            for col_index, key in enumerate(dynamic_headers, start=1):
-                ws.cell(row=row_index, column=col_index, value=candidate.get(key, "N/A"))
+            for col_index, key in enumerate(headers, start=1):
+                value = candidate.get(key, "N/A")
+                
+                # Handle lists (like matched_skills)
+                if isinstance(value, list):
+                    value = ", ".join(str(v) for v in value)
+                # Handle dicts
+                elif isinstance(value, dict):
+                    value = str(value)
+                
+                ws.cell(row=row_index, column=col_index, value=value)
 
         # Auto-adjust column widths
         for column_cells in ws.columns:
-            max_length = max(len(str(cell.value)) if cell.value else 0 for cell in column_cells)
-            ws.column_dimensions[column_cells[0].column_letter].width = min(max_length + 2, 50)
+            max_length = 0
+            column_letter = column_cells[0].column_letter
+            
+            for cell in column_cells:
+                try:
+                    if cell.value:
+                        max_length = max(max_length, len(str(cell.value)))
+                except:
+                    pass
+            
+            adjusted_width = min(max_length + 2, 50)
+            ws.column_dimensions[column_letter].width = adjusted_width
 
-        # Save in memory buffer
+        # Save to memory buffer
         buffer = BytesIO()
         wb.save(buffer)
         buffer.seek(0)
 
         # Convert to base64 for session storage
-        file_b64 = base64.b64encode(buffer.read()).decode("utf-8")
+        file_bytes = buffer.read()
+        file_b64 = base64.b64encode(file_bytes).decode("utf-8")
 
-        # Create filename
+        # Create filename with timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"matched_candidates_{jd_pk or 'export'}_{timestamp}.xlsx"
 
-        # Store in session
+        # Store in session with correct keys
         request.session["excel_file_data"] = file_b64
         request.session["excel_filename"] = filename
-        request.session["matched_candidates_export"] = matched_candidates
+        
+        # Calculate file size for logging
+        file_size_kb = len(file_bytes) / 1024
+        
+        logger.info(f"✅ Excel export stored in session: {filename} ({file_size_kb:.2f} KB)")
+        logger.info(f"   - Candidates: {len(matched_candidates)}")
+        logger.info(f"   - Columns: {len(headers)}")
+        logger.info(f"   - Base64 length: {len(file_b64)}")
 
-        logger.info(f"Excel export stored in session for job {jd_pk or 'N/A'}")
-
-        return True, "Excel export generated and stored successfully!"
+        return True, f"Excel file generated successfully! ({len(matched_candidates)} candidates)"
 
     except Exception as e:
-        logger.error(f"Error exporting candidates: {str(e)}")
+        logger.error(f"❌ Error exporting candidates: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return False, f"Error exporting candidates: {str(e)}"
-
     
 def cleanup_old_matched_files(days=1):
     '''Delete matched candidate files older than specified days'''

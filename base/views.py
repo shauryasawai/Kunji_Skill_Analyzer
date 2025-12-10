@@ -244,16 +244,16 @@ def match_candidates(request, jd_pk):
             messages.warning(request, "No candidates found matching the criteria. Try lowering the match percentage.")
             return redirect('results', pk=jd.pk)
         
-        # Export to Excel
-        output_filename = f"matched_candidates_{jd.title.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-        output_path = Path(settings.MEDIA_ROOT) / 'matched_candidates' / output_filename
-        output_path.parent.mkdir(parents=True, exist_ok=True)
+        # ============================================================
+        # FIXED: Export to Excel and store in session (Vercel compatible)
+        # ============================================================
+        success, message = export_matched_candidates(request, matched_candidates, jd_pk)
         
-        if not export_matched_candidates(matched_candidates, output_path):
-            messages.error(request, "Failed to export matched candidates.")
+        if not success:
+            messages.error(request, message)
             return redirect('results', pk=jd.pk)
         
-        # Store in session (limit data for performance)
+        # Store limited candidate data in session for display
         session_candidates = []
         for candidate in matched_candidates[:MAX_SESSION_CANDIDATES]:
             session_candidates.append({
@@ -277,14 +277,14 @@ def match_candidates(request, jd_pk):
         
         # Store session data
         request.session['matched_candidates'] = session_candidates
-        request.session['output_file'] = str(output_path.relative_to(settings.MEDIA_ROOT))
         request.session['total_matches'] = len(matched_candidates)
         request.session['jd_id'] = jd.pk
+        request.session['match_settings'] = {
+            'min_match_percentage': min_match,
+            'total_skills': len(required_skills)
+        }
         
-        # Cleanup old files
-        cleanup_old_matched_files(days=1)
-        
-        logger.info(f"Found {len(matched_candidates)} matches for JD {jd_pk}")
+        logger.info(f"Found {len(matched_candidates)} matches for JD {jd_pk}, Excel stored in session")
         messages.success(request, f"Found {len(matched_candidates)} matching candidates!")
         return redirect('show_matches', jd_pk=jd.pk)
         
@@ -354,7 +354,8 @@ def download_matched_file(request, jd_pk):
     session_jd_id = request.session.get('jd_id')
     if session_jd_id != jd_pk:
         logger.warning(f"Session JD mismatch for download by user {request.user.id}")
-        raise Http404("File not found or session expired")
+        messages.error(request, "File not found or session expired. Please run the match again.")
+        return redirect('show_matches', jd_pk=jd_pk)
     
     # Get file data from session (base64 encoded)
     file_data_b64 = request.session.get('excel_file_data')
@@ -362,7 +363,8 @@ def download_matched_file(request, jd_pk):
     
     if not file_data_b64:
         logger.warning(f"No file data in session for JD {jd_pk}")
-        raise Http404("File not found or session expired")
+        messages.error(request, "File not found or session expired. Please run the match again.")
+        return redirect('show_matches', jd_pk=jd_pk)
     
     try:
         # Decode base64 file data
@@ -375,13 +377,10 @@ def download_matched_file(request, jd_pk):
         )
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         
-        # Clear session data after successful download
-        request.session.pop('matched_candidates', None)
-        request.session.pop('excel_file_data', None)
-        request.session.pop('excel_filename', None)
-        request.session.pop('output_file', None)
-        request.session.pop('jd_id', None)
-        request.session.pop('match_settings', None)
+        # Optional: Clear session data after successful download
+        # Commented out so user can download multiple times
+        # request.session.pop('excel_file_data', None)
+        # request.session.pop('excel_filename', None)
         
         logger.info(f"File downloaded successfully by user {request.user.id} for JD {jd_pk}")
         return response
