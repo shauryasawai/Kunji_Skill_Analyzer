@@ -20,6 +20,7 @@ import os
 from pathlib import Path
 import logging
 import base64
+
 # Configure logging
 logger = logging.getLogger(__name__)
 
@@ -28,18 +29,122 @@ ALLOWED_FILE_EXTENSIONS = ['.pdf', '.docx', '.doc', '.txt']
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 MAX_SESSION_CANDIDATES = 100
 
+# ============================================================
+# TOKEN TRACKING UTILITIES
+# ============================================================
+
+def log_token_usage(user, operation, prompt_tokens, completion_tokens, total_tokens, model="gpt-4", cost=0.0):
+    """
+    Log OpenAI token usage to database and logger
+    
+    Args:
+        user: Django User object
+        operation: String describing the operation (e.g., "skill_extraction", "matching")
+        prompt_tokens: Number of input tokens
+        completion_tokens: Number of output tokens
+        total_tokens: Total tokens used
+        model: OpenAI model name
+        cost: Estimated cost in USD
+    """
+    try:
+        # Import here to avoid circular imports
+        from .models import TokenUsageLog
+        
+        TokenUsageLog.objects.create(
+            user=user,
+            operation=operation,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=total_tokens,
+            model=model,
+            cost=cost
+        )
+        
+        logger.info(
+            f"Token Usage - User: {user.username}, Operation: {operation}, "
+            f"Prompt: {prompt_tokens}, Completion: {completion_tokens}, "
+            f"Total: {total_tokens}, Model: {model}, Cost: ${cost:.4f}"
+        )
+    except Exception as e:
+        logger.error(f"Failed to log token usage: {str(e)}")
+
+
+def calculate_openai_cost(prompt_tokens, completion_tokens, model="gpt-4"):
+    """
+    Calculate estimated cost based on OpenAI pricing
+    Update these prices according to current OpenAI pricing
+    
+    Pricing as of 2024:
+    - GPT-4: $0.03/1K prompt tokens, $0.06/1K completion tokens
+    - GPT-3.5-turbo: $0.0015/1K prompt tokens, $0.002/1K completion tokens
+    """
+    pricing = {
+        'gpt-4': {'prompt': 0.03, 'completion': 0.06},
+        'gpt-4-turbo': {'prompt': 0.01, 'completion': 0.03},
+        'gpt-3.5-turbo': {'prompt': 0.0015, 'completion': 0.002},
+    }
+    
+    model_pricing = pricing.get(model, pricing['gpt-4'])
+    
+    prompt_cost = (prompt_tokens / 1000) * model_pricing['prompt']
+    completion_cost = (completion_tokens / 1000) * model_pricing['completion']
+    
+    return prompt_cost + completion_cost
+
+
+def get_user_token_stats(user, days=30):
+    """Get token usage statistics for a user"""
+    try:
+        from .models import TokenUsageLog
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        since_date = timezone.now() - timedelta(days=days)
+        
+        logs = TokenUsageLog.objects.filter(
+            user=user,
+            created_at__gte=since_date
+        )
+        
+        stats = {
+            'total_tokens': sum(log.total_tokens for log in logs),
+            'total_cost': sum(log.cost for log in logs),
+            'operation_breakdown': {},
+            'daily_usage': []
+        }
+        
+        # Group by operation
+        for log in logs:
+            if log.operation not in stats['operation_breakdown']:
+                stats['operation_breakdown'][log.operation] = {
+                    'count': 0,
+                    'tokens': 0,
+                    'cost': 0.0
+                }
+            stats['operation_breakdown'][log.operation]['count'] += 1
+            stats['operation_breakdown'][log.operation]['tokens'] += log.total_tokens
+            stats['operation_breakdown'][log.operation]['cost'] += log.cost
+        
+        return stats
+    except Exception as e:
+        logger.error(f"Failed to get token stats: {str(e)}")
+        return None
+
+# ============================================================
+# EXISTING VALIDATION FUNCTIONS
+# ============================================================
+
 def validate_file_upload(uploaded_file):
     """Validate uploaded file for security"""
-    # Check file extension
     ext = os.path.splitext(uploaded_file.name)[1].lower()
     if ext not in ALLOWED_FILE_EXTENSIONS:
         return False, f"File type not allowed. Allowed types: {', '.join(ALLOWED_FILE_EXTENSIONS)}"
     
-    # Check file size
     if uploaded_file.size > MAX_FILE_SIZE:
         return False, f"File size exceeds maximum allowed size of {MAX_FILE_SIZE / (1024*1024)}MB"
     
     return True, None
+
 
 def check_object_permission(request, obj):
     """Check if user has permission to access object"""
@@ -47,6 +152,10 @@ def check_object_permission(request, obj):
         if obj.created_by != request.user and not request.user.is_staff:
             return False
     return True
+
+# ============================================================
+# MODIFIED VIEWS WITH TOKEN TRACKING
+# ============================================================
 
 @login_required
 @csrf_protect
@@ -57,7 +166,6 @@ def upload_jd(request):
         form = JDUploadForm(request.POST, request.FILES)
         
         if form.is_valid():
-            # Validate uploaded file
             uploaded_file = request.FILES.get('file')
             is_valid, error_msg = validate_file_upload(uploaded_file)
             
@@ -68,12 +176,10 @@ def upload_jd(request):
             
             jd = form.save(commit=False)
             jd.created_by = request.user
-            jd.file = request.FILES['file']  # Associate with user
+            jd.file = request.FILES['file']
             jd.save()
             
             domain = request.POST.get('domain', '')
-            
-            # Extract text from uploaded file
             file_path = jd.file.path
             
             try:
@@ -81,18 +187,47 @@ def upload_jd(request):
                 
                 if not jd_text:
                     messages.error(request, "Could not extract text from the file.")
-                    # Delete the uploaded file
                     if os.path.exists(file_path):
                         os.remove(file_path)
                     jd.delete()
                     logger.error(f"Text extraction failed for JD {jd.id} by user {request.user.id}")
                     return redirect('upload_jd')
                 
-                # Store extracted text in database
                 jd.jd_text = jd_text
                 
-                # Extract comprehensive skills using OpenAI
+                # ============================================================
+                # MODIFIED: Extract skills with token tracking
+                # ============================================================
                 result = extract_skills_from_jd(jd_text, domain)
+                
+                # Check if token usage was returned
+                if 'token_usage' in result:
+                    token_usage = result['token_usage']
+                    model = result.get('model', 'gpt-4')
+                    
+                    # Calculate cost
+                    cost = calculate_openai_cost(
+                        token_usage['prompt_tokens'],
+                        token_usage['completion_tokens'],
+                        model
+                    )
+                    
+                    # Log token usage
+                    log_token_usage(
+                        user=request.user,
+                        operation='skill_extraction',
+                        prompt_tokens=token_usage['prompt_tokens'],
+                        completion_tokens=token_usage['completion_tokens'],
+                        total_tokens=token_usage['total_tokens'],
+                        model=model,
+                        cost=cost
+                    )
+                    
+                    # Add user-friendly message
+                    messages.info(
+                        request,
+                        f"AI Analysis: {token_usage['total_tokens']} tokens used (${cost:.4f})"
+                    )
                 
                 # Get LinkedIn optimized skills
                 linkedin_skills = result.get('linkedin_optimized_skills', result.get('all_skills', [])[:10])
@@ -113,9 +248,9 @@ def upload_jd(request):
                 jd.experience_level = result.get('experience_level', 'Unknown')
                 jd.key_responsibilities = " | ".join(result.get('key_responsibilities', []))
                 jd.qualifications = " | ".join(result.get('qualifications', [])) if isinstance(result.get('qualifications'), list) else result.get('qualifications', '')
-                jd.save()  # This will trigger file deletion via model's save() method
+                jd.save()
                 
-                # Save to Excel with comprehensive data
+                # Save to Excel
                 excel_data = {
                     'Job Title': jd.title,
                     'All Skills Required': jd.all_skills,
@@ -144,13 +279,22 @@ def upload_jd(request):
     else:
         form = JDUploadForm()
     
-    # Show only user's JDs (staff can see all)
+    # Show user's token usage stats
+    token_stats = get_user_token_stats(request.user, days=30)
+    
     if request.user.is_staff:
         recent_jds = JobDescription.objects.all()[:10]
     else:
         recent_jds = JobDescription.objects.filter(created_by=request.user)[:10]
     
-    return render(request, 'base/upload.html', {'form': form, 'recent_jds': recent_jds})
+    context = {
+        'form': form,
+        'recent_jds': recent_jds,
+        'token_stats': token_stats
+    }
+    
+    return render(request, 'base/upload.html', context)
+
 
 @login_required
 @require_http_methods(["GET"])
@@ -158,12 +302,10 @@ def results(request, pk):
     """View job description results - requires authentication and ownership"""
     jd = get_object_or_404(JobDescription, pk=pk)
     
-    # Check permission
     if not check_object_permission(request, jd):
         logger.warning(f"Unauthorized access attempt to JD {pk} by user {request.user.id}")
         raise PermissionDenied("You don't have permission to view this job description.")
     
-    # Parse LinkedIn search strings
     linkedin_searches = {}
     if jd.linkedin_search_string:
         try:
@@ -172,10 +314,8 @@ def results(request, pk):
             linkedin_searches = {}
             logger.error(f"Failed to parse LinkedIn search strings for JD {pk}")
     
-    # Check API availability
     api_available = hasattr(settings, 'CANDIDATES_API_URL') and settings.CANDIDATES_API_URL
     
-    # Get candidate count from API (optional - for display purposes)
     total_candidates = 0
     if api_available:
         try:
@@ -201,6 +341,7 @@ def results(request, pk):
     
     return render(request, 'base/results.html', context)
 
+
 @login_required
 @require_POST
 @csrf_protect
@@ -208,7 +349,6 @@ def match_candidates(request, jd_pk):
     """Match candidates from API with JD requirements"""
     jd = get_object_or_404(JobDescription, pk=jd_pk)
     
-    # Check permission
     if not check_object_permission(request, jd):
         logger.warning(f"Unauthorized match attempt for JD {jd_pk} by user {request.user.id}")
         raise PermissionDenied("You don't have permission to match candidates for this job description.")
@@ -220,10 +360,7 @@ def match_candidates(request, jd_pk):
         messages.error(request, "Invalid form data. Please check your inputs.")
         return redirect('results', pk=jd.pk)
     
-    # Get form data
     min_match = form.cleaned_data['min_match_percentage']
-    
-    # Get required skills from JD
     required_skills = jd.get_all_skills_list()
     
     if not required_skills:
@@ -233,27 +370,54 @@ def match_candidates(request, jd_pk):
     try:
         logger.info(f"Matching candidates for JD {jd_pk} with {len(required_skills)} skills, min_match={min_match}%")
         
-        # Match candidates from API
-        matched_candidates = match_candidates_with_jd(
+        result = match_candidates_with_jd(
             required_skills=required_skills,
             min_match_percentage=min_match
         )
+        
+        # Check if result includes token usage (if matching uses OpenAI)
+        if isinstance(result, dict) and 'candidates' in result:
+            matched_candidates = result['candidates']
+            
+            if 'token_usage' in result:
+                token_usage = result['token_usage']
+                model = result.get('model', 'gpt-4')
+                
+                cost = calculate_openai_cost(
+                    token_usage['prompt_tokens'],
+                    token_usage['completion_tokens'],
+                    model
+                )
+                
+                log_token_usage(
+                    user=request.user,
+                    operation='candidate_matching',
+                    prompt_tokens=token_usage['prompt_tokens'],
+                    completion_tokens=token_usage['completion_tokens'],
+                    total_tokens=token_usage['total_tokens'],
+                    model=model,
+                    cost=cost
+                )
+                
+                messages.info(
+                    request,
+                    f"AI Matching: {token_usage['total_tokens']} tokens used (${cost:.4f})"
+                )
+        else:
+            matched_candidates = result
         
         if not matched_candidates:
             logger.info(f"No matches found for JD {jd_pk} with threshold {min_match}%")
             messages.warning(request, "No candidates found matching the criteria. Try lowering the match percentage.")
             return redirect('results', pk=jd.pk)
         
-        # ============================================================
-        # FIXED: Export to Excel and store in session (Vercel compatible)
-        # ============================================================
         success, message = export_matched_candidates(request, matched_candidates, jd_pk)
         
         if not success:
             messages.error(request, message)
             return redirect('results', pk=jd.pk)
         
-        # Store limited candidate data in session for display
+        # Store limited candidate data in session
         session_candidates = []
         for candidate in matched_candidates[:MAX_SESSION_CANDIDATES]:
             session_candidates.append({
@@ -275,7 +439,6 @@ def match_candidates(request, jd_pk):
                 'status': candidate.get('status', 'Active')
             })
         
-        # Store session data
         request.session['matched_candidates'] = session_candidates
         request.session['total_matches'] = len(matched_candidates)
         request.session['jd_id'] = jd.pk
@@ -283,8 +446,10 @@ def match_candidates(request, jd_pk):
             'min_match_percentage': min_match,
             'total_skills': len(required_skills)
         }
+        # FIX: Add sheet_name to session (it's set by export_matched_candidates but let's be explicit)
+        request.session['sheet_name'] = 'Matched Candidates'
         
-        logger.info(f"Found {len(matched_candidates)} matches for JD {jd_pk}, Excel stored in session")
+        logger.info(f"Found {len(matched_candidates)} matches for JD {jd_pk}")
         messages.success(request, f"Found {len(matched_candidates)} matching candidates!")
         return redirect('show_matches', jd_pk=jd.pk)
         
@@ -293,18 +458,17 @@ def match_candidates(request, jd_pk):
         messages.error(request, f"An error occurred while matching candidates: {str(e)}")
         return redirect('results', pk=jd.pk)
 
+
 @login_required
 @require_http_methods(["GET"])
 def show_matches(request, jd_pk):
     """Display matched candidates - requires authentication and ownership"""
     jd = get_object_or_404(JobDescription, pk=jd_pk)
     
-    # Check permission
     if not check_object_permission(request, jd):
         logger.warning(f"Unauthorized access to matches for JD {jd_pk} by user {request.user.id}")
         raise PermissionDenied("You don't have permission to view these matches.")
     
-    # Verify session data belongs to this JD
     session_jd_id = request.session.get('jd_id')
     if session_jd_id != jd_pk:
         logger.warning(f"Session JD mismatch for user {request.user.id}")
@@ -312,11 +476,13 @@ def show_matches(request, jd_pk):
         return redirect('results', pk=jd_pk)
     
     matched_candidates = request.session.get('matched_candidates', [])
-    output_file = request.session.get('output_file', '')
+    # FIX: Add this line to get excel file info from session
+    output_file = request.session.get('excel_filename', '')
+    sheet_name = request.session.get('sheet_name', 'Matched Candidates')
+    
     total_matches = request.session.get('total_matches', len(matched_candidates))
     match_settings = request.session.get('match_settings', {})
     
-    # Calculate statistics
     if matched_candidates:
         avg_match = sum(c['match_percentage'] for c in matched_candidates) / len(matched_candidates)
         top_match = max(matched_candidates, key=lambda x: x['match_percentage'])
@@ -327,7 +493,9 @@ def show_matches(request, jd_pk):
     context = {
         'jd': jd,
         'matched_candidates': matched_candidates,
+        # FIX: Add these two lines
         'output_file': output_file,
+        'sheet_name': sheet_name,
         'total_matches': total_matches,
         'match_settings': match_settings,
         'avg_match_percentage': round(avg_match, 1),
@@ -338,26 +506,25 @@ def show_matches(request, jd_pk):
     
     return render(request, 'base/show_matches.html', context)
 
-from io import BytesIO
+
 @login_required
 @require_http_methods(["GET"])
 def download_matched_file(request, jd_pk):
-    """Download matched candidates file - Vercel compatible (session-based storage)"""
+    """Download matched candidates file - Vercel compatible"""
+    from io import BytesIO
+    
     jd = get_object_or_404(JobDescription, pk=jd_pk)
     
-    # Check permission
     if not check_object_permission(request, jd):
         logger.warning(f"Unauthorized download attempt for JD {jd_pk} by user {request.user.id}")
         raise PermissionDenied("You don't have permission to download this file.")
     
-    # Verify session data belongs to this JD
     session_jd_id = request.session.get('jd_id')
     if session_jd_id != jd_pk:
         logger.warning(f"Session JD mismatch for download by user {request.user.id}")
         messages.error(request, "File not found or session expired. Please run the match again.")
         return redirect('show_matches', jd_pk=jd_pk)
     
-    # Get file data from session (base64 encoded)
     file_data_b64 = request.session.get('excel_file_data')
     filename = request.session.get('excel_filename', 'matched_candidates.xlsx')
     
@@ -367,20 +534,13 @@ def download_matched_file(request, jd_pk):
         return redirect('show_matches', jd_pk=jd_pk)
     
     try:
-        # Decode base64 file data
         file_data = base64.b64decode(file_data_b64)
         
-        # Serve from memory
         response = FileResponse(
             BytesIO(file_data),
             content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
-        
-        # Optional: Clear session data after successful download
-        # Commented out so user can download multiple times
-        # request.session.pop('excel_file_data', None)
-        # request.session.pop('excel_filename', None)
         
         logger.info(f"File downloaded successfully by user {request.user.id} for JD {jd_pk}")
         return response
@@ -394,6 +554,7 @@ def download_matched_file(request, jd_pk):
         messages.error(request, f"Error downloading file: {str(e)}")
         return redirect('show_matches', jd_pk=jd_pk)
 
+
 @login_required
 @require_http_methods(["GET"])
 def test_api_connection(request):
@@ -406,7 +567,6 @@ def test_api_connection(request):
         else:
             messages.success(request, f"API connection successful! Found {len(df)} candidates.")
             
-            # Show sample columns
             if not df.empty:
                 columns = df.columns.tolist()
                 messages.info(request, f"Available columns: {', '.join(columns[:10])}")
@@ -417,7 +577,7 @@ def test_api_connection(request):
         logger.error(f"API connection test failed: {str(e)}")
         messages.error(request, f"API connection failed: {str(e)}")
         return redirect('upload_jd')
-    
+
 
 @login_required
 @require_http_methods(["GET"])
@@ -431,7 +591,6 @@ def test_api_connection_init(request):
         else:
             messages.success(request, f"API connection successful! Found {len(df)} candidates.")
             
-            # Show sample columns
             if not df.empty:
                 columns = df.columns.tolist()
                 messages.info(request, f"Available columns: {', '.join(columns[:10])}")
@@ -442,3 +601,177 @@ def test_api_connection_init(request):
         logger.error(f"API connection test failed: {str(e)}")
         messages.error(request, f"API connection failed: {str(e)}")
         return redirect('upload_jd')
+
+
+# ============================================================
+# Token Usage Dashboard
+# ============================================================
+
+from django.core.cache import cache
+from django.db.models import Sum, Avg, Count
+
+def get_organization_stats():
+    """Get organization-wide token usage statistics"""
+    try:
+        from .models import TokenUsageLog
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        since_date = timezone.now() - timedelta(days=30)
+        
+        # Use aggregation for better performance
+        stats = TokenUsageLog.objects.filter(
+            created_at__gte=since_date
+        ).aggregate(
+            total_tokens=Sum('total_tokens'),
+            total_cost=Sum('cost'),
+            total_users=Count('user', distinct=True),
+            total_operations=Count('id')
+        )
+        
+        return {
+            'total_tokens': stats['total_tokens'] or 0,
+            'total_cost': stats['total_cost'] or 0.0,
+            'total_users': stats['total_users'] or 0,
+            'total_operations': stats['total_operations'] or 0
+        }
+    except Exception as e:
+        logger.error(f"Failed to get org stats: {str(e)}")
+        return None
+    
+
+def calculate_usage_insights(stats_30, stats_7, stats_today):
+    """Calculate usage insights and trends"""
+    insights = {
+        'trend': 'stable',
+        'efficiency_score': 0,
+        'recommendations': []
+    }
+    
+    try:
+        # Calculate trend
+        if stats_30['total_tokens'] and stats_7['total_tokens']:
+            weekly_rate = stats_7['total_tokens'] / 7
+            monthly_rate = stats_30['total_tokens'] / 30
+            
+            if weekly_rate > monthly_rate * 1.5:
+                insights['trend'] = 'increasing'
+                insights['recommendations'].append(
+                    'Usage is higher than average this week. Consider optimizing prompts.'
+                )
+            elif weekly_rate < monthly_rate * 0.5:
+                insights['trend'] = 'decreasing'
+            else:
+                insights['trend'] = 'stable'
+        
+        # Calculate efficiency score (0-100)
+        if stats_30['total_tokens'] and stats_30['total_cost']:
+            cost_per_1k = (stats_30['total_cost'] / stats_30['total_tokens']) * 1000
+            
+            # Assuming gpt-4o-mini pricing ($0.15 per 1M tokens input, $0.60 per 1M tokens output)
+            # Average should be around $0.0004 per 1K tokens
+            if cost_per_1k <= 0.0004:
+                insights['efficiency_score'] = 100
+            elif cost_per_1k <= 0.0006:
+                insights['efficiency_score'] = 80
+            elif cost_per_1k <= 0.001:
+                insights['efficiency_score'] = 60
+            else:
+                insights['efficiency_score'] = 40
+                insights['recommendations'].append(
+                    'Consider using more efficient models or optimizing prompt lengths.'
+                )
+        
+        # Operation-specific insights
+        if stats_30.get('operation_breakdown'):
+            breakdown = stats_30['operation_breakdown']
+            
+            # Find most expensive operation
+            most_expensive = max(breakdown.items(), key=lambda x: x[1]['cost'])
+            insights['most_expensive_operation'] = most_expensive[0]
+            
+            # Check if skill extraction is too frequent
+            if 'skill_extraction' in breakdown:
+                skill_count = breakdown['skill_extraction']['count']
+                if skill_count > 100:
+                    insights['recommendations'].append(
+                        f'You performed {skill_count} skill extractions. Consider batching or caching results.'
+                    )
+        
+        # Daily usage pattern
+        if stats_today['total_tokens']:
+            daily_avg = stats_30['total_tokens'] / 30 if stats_30['total_tokens'] else 0
+            if stats_today['total_tokens'] > daily_avg * 2:
+                insights['recommendations'].append(
+                    'Today\'s usage is unusually high. Monitor your operations.'
+                )
+    
+    except Exception as e:
+        logger.error(f"Error calculating insights: {str(e)}")
+    
+    return insights
+
+@login_required
+@require_http_methods(["GET"])
+def token_usage_dashboard(request):
+    """
+    Display comprehensive token usage statistics for the user
+    With caching for better performance
+    """
+    user = request.user
+    cache_key = f'token_stats_{user.id}'
+    
+    # Try to get cached stats (cache for 5 minutes)
+    cached_stats = cache.get(cache_key)
+    
+    if cached_stats and not request.GET.get('refresh'):
+        # Use cached data
+        context = cached_stats
+        context['cached'] = True
+        context['cache_time'] = cache.ttl(cache_key)
+    else:
+        # Calculate fresh stats
+        stats_30_days = get_user_token_stats(request.user, days=30)
+        stats_7_days = get_user_token_stats(request.user, days=7)
+        stats_today = get_user_token_stats(request.user, days=1)
+        
+        # Get recent token logs with optimized query
+        try:
+            from .models import TokenUsageLog
+            recent_logs = TokenUsageLog.objects.filter(
+                user=request.user
+            ).select_related('user').order_by('-created_at')[:50]
+        except:
+            recent_logs = []
+        
+        # For staff users, show organization-wide stats
+        org_stats = None
+        if request.user.is_staff:
+            org_stats = get_organization_stats()
+        
+        # Calculate additional insights
+        insights = calculate_usage_insights(stats_30_days, stats_7_days, stats_today)
+        
+        context = {
+            'stats_30_days': stats_30_days,
+            'stats_7_days': stats_7_days,
+            'stats_today': stats_today,
+            'recent_logs': recent_logs,
+            'org_stats': org_stats,
+            'insights': insights,
+            'cached': False
+        }
+        
+        # Cache for 5 minutes
+        cache.set(cache_key, context, 300)
+    
+    return render(request, 'base/token_usage_dashboard.html', context)
+
+@login_required
+@require_http_methods(["POST"])
+def clear_token_cache(request):
+    """Clear cached token statistics"""
+    cache_key = f'token_stats_{request.user.id}'
+    cache.delete(cache_key)
+    messages.success(request, "Token statistics refreshed successfully!")
+    return redirect('token_usage_dashboard')

@@ -21,4 +21,5 @@ urlpatterns = [
     path('show-matches/<int:jd_pk>/', views.show_matches, name='show_matches'),
     path('test-api/', views.test_api_connection, name='test_api_connection'),
     path('download-matches/<int:jd_pk>/', views.download_matched_file, name='download_matched_file'),
+    path('token-usage/', views.token_usage_dashboard, name='token_usage_dashboard'),
 ]

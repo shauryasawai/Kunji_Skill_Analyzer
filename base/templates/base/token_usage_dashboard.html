@@ -1,0 +1,430 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}Token Usage Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 py-4">
+    <!-- Header with Export Button -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h2 mb-1">🔋 OpenAI Token Usage Dashboard</h1>
+            <p class="text-muted">Track your AI token consumption and costs in real-time</p>
+        </div>
+        <div>
+            <button class="btn btn-outline-primary btn-sm me-2" onclick="window.print()">
+                📊 Export Report
+            </button>
+            <a href="{% url 'upload_jd' %}" class="btn btn-primary btn-sm">
+                ← Back to Upload
+            </a>
+        </div>
+    </div>
+
+    <!-- Quick Stats Cards -->
+    <div class="row g-3 mb-4">
+        <!-- Today's Usage -->
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                <div class="card-body text-white">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div>
+                            <h6 class="text-white-50 mb-0 text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.5px;">Today</h6>
+                        </div>
+                        <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" opacity="0.6">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                    </div>
+                    <h2 class="mb-1 fw-bold">{{ stats_today.total_tokens|default:0|floatformat:0 }}</h2>
+                    <p class="mb-2 small opacity-75">tokens used</p>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0 fw-bold">${{ stats_today.total_cost|default:0|floatformat:4 }}</h4>
+                        {% if stats_7_days.total_tokens and stats_today.total_tokens %}
+                            {% widthratio stats_today.total_tokens stats_7_days.total_tokens 100 as daily_pct %}
+                            <small class="badge bg-white bg-opacity-25">{{ daily_pct }}% of 7d</small>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 7 Days Usage -->
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                <div class="card-body text-white">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div>
+                            <h6 class="text-white-50 mb-0 text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.5px;">Last 7 Days</h6>
+                        </div>
+                        <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" opacity="0.6">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                    </div>
+                    <h2 class="mb-1 fw-bold">{{ stats_7_days.total_tokens|default:0|floatformat:0 }}</h2>
+                    <p class="mb-2 small opacity-75">tokens used</p>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0 fw-bold">${{ stats_7_days.total_cost|default:0|floatformat:4 }}</h4>
+                        {% if stats_7_days.total_tokens %}
+                            <small class="badge bg-white bg-opacity-25">~{{ stats_7_days.total_tokens|divisibleby:7|floatformat:0 }}/day</small>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 30 Days Usage -->
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                <div class="card-body text-white">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div>
+                            <h6 class="text-white-50 mb-0 text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.5px;">Last 30 Days</h6>
+                        </div>
+                        <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" opacity="0.6">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                    </div>
+                    <h2 class="mb-1 fw-bold">{{ stats_30_days.total_tokens|default:0|floatformat:0 }}</h2>
+                    <p class="mb-2 small opacity-75">tokens used</p>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0 fw-bold">${{ stats_30_days.total_cost|default:0|floatformat:4 }}</h4>
+                        {% if stats_30_days.total_tokens %}
+                            <small class="badge bg-white bg-opacity-25">~{{ stats_30_days.total_tokens|divisibleby:30|floatformat:0 }}/day</small>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cost Efficiency -->
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm h-100" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">
+                <div class="card-body text-white">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div>
+                            <h6 class="text-white-50 mb-0 text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.5px;">Cost per 1K Tokens</h6>
+                        </div>
+                        <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" opacity="0.6">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    {% if stats_30_days.total_tokens and stats_30_days.total_cost %}
+                        {% widthratio stats_30_days.total_cost stats_30_days.total_tokens 1000 as cost_per_1k %}
+                        <h2 class="mb-1 fw-bold">${{ cost_per_1k|floatformat:4 }}</h2>
+                    {% else %}
+                        <h2 class="mb-1 fw-bold">$0.0000</h2>
+                    {% endif %}
+                    <p class="mb-2 small opacity-75">average efficiency</p>
+                    <div class="d-flex justify-content-between align-items-center">
+                        {% if stats_30_days.operation_breakdown %}
+                            <h4 class="mb-0 fw-bold">{{ stats_30_days.operation_breakdown|length }}</h4>
+                            <small class="badge bg-white bg-opacity-25">operations</small>
+                        {% else %}
+                            <h4 class="mb-0 fw-bold">0</h4>
+                            <small class="badge bg-white bg-opacity-25">operations</small>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Organization Stats (Staff Only) -->
+    {% if user.is_staff and org_stats %}
+    <div class="card border-0 shadow-sm mb-4" style="border-left: 4px solid #fbbf24 !important;">
+        <div class="card-body">
+            <div class="d-flex align-items-center mb-4">
+                <div class="bg-warning bg-opacity-10 p-3 rounded-circle me-3">
+                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-warning">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="h5 mb-0">Organization-Wide Analytics</h3>
+                    <p class="text-muted small mb-0">Last 30 days across all team members</p>
+                </div>
+            </div>
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <div class="p-3 bg-light rounded">
+                        <div class="d-flex align-items-center mb-2">
+                            <span class="badge bg-primary bg-opacity-10 text-primary me-2">📊</span>
+                            <small class="text-muted">Total Tokens</small>
+                        </div>
+                        <h4 class="mb-0">{{ org_stats.total_tokens|floatformat:0 }}</h4>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="p-3 bg-light rounded">
+                        <div class="d-flex align-items-center mb-2">
+                            <span class="badge bg-success bg-opacity-10 text-success me-2">💰</span>
+                            <small class="text-muted">Total Cost</small>
+                        </div>
+                        <h4 class="mb-0">${{ org_stats.total_cost|floatformat:2 }}</h4>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="p-3 bg-light rounded">
+                        <div class="d-flex align-items-center mb-2">
+                            <span class="badge bg-info bg-opacity-10 text-info me-2">👥</span>
+                            <small class="text-muted">Active Users</small>
+                        </div>
+                        <h4 class="mb-0">{{ org_stats.total_users }}</h4>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="p-3 bg-light rounded">
+                        <div class="d-flex align-items-center mb-2">
+                            <span class="badge bg-warning bg-opacity-10 text-warning me-2">⚡</span>
+                            <small class="text-muted">Operations</small>
+                        </div>
+                        <h4 class="mb-0">{{ org_stats.total_operations }}</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <!-- Operation Breakdown -->
+        <div class="col-lg-8">
+            {% if stats_30_days.operation_breakdown %}
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white border-0 pt-4 pb-3">
+                    <div class="d-flex align-items-center">
+                        <div class="bg-primary bg-opacity-10 p-2 rounded me-3">
+                            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="text-primary">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <h5 class="mb-0">Usage by Operation</h5>
+                            <p class="text-muted small mb-0">Detailed breakdown of AI operations in the last 30 days</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="border-0 ps-4">Operation</th>
+                                    <th class="border-0 text-center">Calls</th>
+                                    <th class="border-0 text-end">Total Tokens</th>
+                                    <th class="border-0 text-end">Avg/Call</th>
+                                    <th class="border-0 text-end">Cost</th>
+                                    <th class="border-0 text-end pe-4">Share</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for operation, data in stats_30_days.operation_breakdown.items %}
+                                <tr>
+                                    <td class="ps-4">
+                                        {% if operation == 'skill_extraction' %}
+                                            <span class="badge bg-primary bg-opacity-10 text-primary">
+                                                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="me-1" style="vertical-align: middle;">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                                </svg>
+                                                Skill Extraction
+                                            </span>
+                                        {% elif operation == 'candidate_matching' %}
+                                            <span class="badge bg-success bg-opacity-10 text-success">
+                                                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="me-1" style="vertical-align: middle;">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                                                </svg>
+                                                Candidate Matching
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-secondary bg-opacity-10 text-secondary">{{ operation|title }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-light text-dark">{{ data.count }}</span>
+                                    </td>
+                                    <td class="text-end font-monospace">{{ data.tokens|floatformat:0 }}</td>
+                                    <td class="text-end text-muted small">{{ data.tokens|divisibleby:data.count|floatformat:0 }}</td>
+                                    <td class="text-end fw-bold">${{ data.cost|floatformat:4 }}</td>
+                                    <td class="text-end pe-4">
+                                        {% widthratio data.tokens stats_30_days.total_tokens 100 as percentage %}
+                                        <div class="d-flex align-items-center justify-content-end">
+                                            <div class="progress me-2" style="width: 60px; height: 8px;">
+                                                <div class="progress-bar {% if operation == 'skill_extraction' %}bg-primary{% elif operation == 'candidate_matching' %}bg-success{% else %}bg-secondary{% endif %}" 
+                                                     role="progressbar" 
+                                                     style="width: {{ percentage }}%"
+                                                     aria-valuenow="{{ percentage }}" 
+                                                     aria-valuemin="0" 
+                                                     aria-valuemax="100">
+                                                </div>
+                                            </div>
+                                            <small class="text-muted">{{ percentage }}%</small>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot class="table-light">
+                                <tr>
+                                    <td class="ps-4 fw-bold">Total</td>
+                                    <td class="text-center fw-bold">
+                                        {% with total_calls=0 %}
+                                            {% for op, data in stats_30_days.operation_breakdown.items %}
+                                                {% widthratio data.count 1 1 as calls %}
+                                            {% endfor %}
+                                        {% endwith %}
+                                        <span class="badge bg-dark">
+                                            {% for op, data in stats_30_days.operation_breakdown.items %}{{ data.count|add:0 }}{% if not forloop.last %}+{% endif %}{% endfor %}
+                                        </span>
+                                    </td>
+                                    <td class="text-end fw-bold font-monospace">{{ stats_30_days.total_tokens|floatformat:0 }}</td>
+                                    <td class="text-end">-</td>
+                                    <td class="text-end fw-bold">${{ stats_30_days.total_cost|floatformat:4 }}</td>
+                                    <td class="text-end pe-4 fw-bold">100%</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Recent Activity & Insights -->
+        <div class="col-lg-4">
+            <!-- Cost Insights -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white border-0 pt-4 pb-3">
+                    <h6 class="mb-0">💡 Cost Insights</h6>
+                </div>
+                <div class="card-body">
+                    {% if stats_30_days.total_cost %}
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <small class="text-muted">Monthly Projection</small>
+                                <small class="fw-bold">${{ stats_30_days.total_cost|floatformat:2 }}</small>
+                            </div>
+                            <div class="progress" style="height: 8px;">
+                                {% widthratio stats_30_days.total_cost 100 100 as cost_progress %}
+                                <div class="progress-bar bg-info" role="progressbar" style="width: {{ cost_progress|add:10 }}%" aria-valuenow="{{ cost_progress }}" aria-valuemin="0" aria-valuemax="100"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <small class="text-muted">Daily Average</small>
+                                <small class="fw-bold">${{ stats_30_days.total_cost|divisibleby:30|floatformat:4 }}</small>
+                            </div>
+                        </div>
+
+                        {% if stats_7_days.total_cost and stats_30_days.total_cost %}
+                            {% widthratio stats_7_days.total_cost stats_30_days.total_cost 100 as weekly_pct %}
+                            <div class="alert alert-{% if weekly_pct > 30 %}warning{% else %}success{% endif %} alert-sm mb-0">
+                                <small>
+                                    <strong>Last 7 days:</strong> {{ weekly_pct }}% of monthly usage
+                                    {% if weekly_pct > 30 %}
+                                        <br><span class="text-muted">📈 Higher than average</span>
+                                    {% else %}
+                                        <br><span class="text-muted">✅ Normal usage</span>
+                                    {% endif %}
+                                </small>
+                            </div>
+                        {% endif %}
+                    {% else %}
+                        <p class="text-muted small mb-0">No usage data available yet.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Recent Activity Timeline -->
+            {% if recent_logs %}
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 pt-4 pb-3">
+                    <h6 class="mb-0">🕐 Recent Activity</h6>
+                </div>
+                <div class="card-body" style="max-height: 500px; overflow-y: auto;">
+                    <div class="timeline">
+                        {% for log in recent_logs|slice:":15" %}
+                        <div class="timeline-item mb-3 pb-3 {% if not forloop.last %}border-bottom{% endif %}">
+                            <div class="d-flex align-items-start">
+                                <div class="timeline-marker me-3 mt-1">
+                                    <div class="rounded-circle {% if log.operation == 'skill_extraction' %}bg-primary{% elif log.operation == 'candidate_matching' %}bg-success{% else %}bg-secondary{% endif %} bg-opacity-10 p-2">
+                                        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="{% if log.operation == 'skill_extraction' %}text-primary{% elif log.operation == 'candidate_matching' %}text-success{% else %}text-secondary{% endif %}">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                        </svg>
+                                    </div>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <div class="d-flex justify-content-between align-items-start mb-1">
+                                        <span class="badge {% if log.operation == 'skill_extraction' %}bg-primary{% elif log.operation == 'candidate_matching' %}bg-success{% else %}bg-secondary{% endif %} bg-opacity-10 {% if log.operation == 'skill_extraction' %}text-primary{% elif log.operation == 'candidate_matching' %}text-success{% else %}text-secondary{% endif %} small">
+                                            {{ log.operation|title }}
+                                        </span>
+                                        <small class="text-muted">{{ log.created_at|timesince }} ago</small>
+                                    </div>
+                                    <div class="d-flex align-items-center text-muted small">
+                                        <span class="me-3">⚡ {{ log.total_tokens }} tokens</span>
+                                        <span class="me-3">💰 ${{ log.cost|floatformat:4 }}</span>
+                                        <span class="badge bg-light text-dark">{{ log.model }}</span>
+                                    </div>
+                                    <div class="text-muted" style="font-size: 0.7rem; margin-top: 0.25rem;">
+                                        P: {{ log.prompt_tokens }} | C: {{ log.completion_tokens }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Empty State -->
+    {% if not recent_logs and not stats_30_days.operation_breakdown %}
+    <div class="card border-0 shadow-sm">
+        <div class="card-body text-center py-5">
+            <div class="mb-4">
+                <svg width="80" height="80" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" class="text-muted mx-auto">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+            </div>
+            <h4 class="mb-3">No Token Usage Yet</h4>
+            <p class="text-muted mb-4">Start by uploading a job description to analyze skills and match candidates.</p>
+            <a href="{% url 'upload_jd' %}" class="btn btn-primary">
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="me-1" style="vertical-align: middle;">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Upload Job Description
+            </a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+@media print {
+    .btn, .card-header { display: none !important; }
+    .card { box-shadow: none !important; border: 1px solid #dee2e6 !important; }
+}
+
+.timeline-item:last-child {
+    border-bottom: none !important;
+}
+
+.font-monospace {
+    font-family: 'Courier New', Courier, monospace;
+}
+
+.card {
+    transition: transform 0.2s ease;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+}
+
+.progress {
+    background-color: rgba(0,0,0,0.05);
+}
+</style>
+{% endblock %}

@@ -27,7 +27,29 @@ logger = logging.getLogger(__name__)
 DESIGNATION_CACHE = {}
 SKILL_RELEVANCE_CACHE = {}
 
+# Global token usage tracker (resets on server restart)
+GLOBAL_TOKEN_USAGE = {
+    'total_tokens': 0,
+    'total_cost': 0.0,
+    'operations': defaultdict(lambda: {'tokens': 0, 'calls': 0, 'cost': 0.0})
+}
 
+def track_global_tokens(operation, tokens, model='gpt-4o-mini'):
+    """Track tokens globally across all operations"""
+    pricing = {
+        'gpt-4o-mini': {'prompt': 0.00015, 'completion': 0.0006},  # per 1K tokens
+        'gpt-4': {'prompt': 0.03, 'completion': 0.06},
+    }
+    
+    model_pricing = pricing.get(model, pricing['gpt-4o-mini'])
+    cost = (tokens.get('prompt_tokens', 0) / 1000 * model_pricing['prompt'] + 
+            tokens.get('completion_tokens', 0) / 1000 * model_pricing['completion'])
+    
+    GLOBAL_TOKEN_USAGE['total_tokens'] += tokens.get('total_tokens', 0)
+    GLOBAL_TOKEN_USAGE['total_cost'] += cost
+    GLOBAL_TOKEN_USAGE['operations'][operation]['tokens'] += tokens.get('total_tokens', 0)
+    GLOBAL_TOKEN_USAGE['operations'][operation]['calls'] += 1
+    GLOBAL_TOKEN_USAGE['operations'][operation]['cost'] += cost
 
 
 GENERIC_SOFT_SKILLS = {
@@ -85,7 +107,7 @@ def generate_role_keyword_profile(jd_role_title: str):
 # ============================================================================
 
 def call_openai_analysis(prompt, system_message, temperature=0.2, max_tokens=300):
-    """Unified OpenAI API call with error handling"""
+    """Unified OpenAI API call with error handling and token tracking"""
     try:
         client = OpenAI(api_key=settings.OPENAI_API_KEY)
         
@@ -102,7 +124,20 @@ def call_openai_analysis(prompt, system_message, temperature=0.2, max_tokens=300
         content = response.choices[0].message.content.strip()
         cleaned = re.sub(r"^```json\s*|\s*```$", "", content, flags=re.MULTILINE).strip()
         
-        return json.loads(cleaned)
+        # Extract token usage
+        token_usage = {
+            'prompt_tokens': response.usage.prompt_tokens,
+            'completion_tokens': response.usage.completion_tokens,
+            'total_tokens': response.usage.total_tokens
+        }
+        
+        result = json.loads(cleaned)
+        
+        # Add token usage to result
+        if isinstance(result, dict):
+            result['_token_usage'] = token_usage
+        
+        return result
     
     except json.JSONDecodeError as je:
         print(f"⚠️ JSON Decode Error: {je}")
@@ -174,7 +209,7 @@ Return ONLY valid JSON (no markdown, no code blocks):
     return True
 
 def calculate_skill_relevance_score(matched_skills, jd_role_title, candidate_designation, use_cache=True):
-    '''Use OpenAI to calculate how relevant the matched skills are to the role - BALANCED VERSION'''
+    '''Use OpenAI to calculate how relevant the matched skills are to the role - BALANCED VERSION with token tracking'''
     if not matched_skills:
         return 0
     
@@ -186,7 +221,11 @@ def calculate_skill_relevance_score(matched_skills, jd_role_title, candidate_des
     cache_key = f"{jd_role_title}||{skills_key}"
     
     if use_cache and cache_key in SKILL_RELEVANCE_CACHE:
-        return SKILL_RELEVANCE_CACHE[cache_key]
+        cached_result = SKILL_RELEVANCE_CACHE[cache_key]
+        # If cached, return just the score (no new tokens used)
+        if isinstance(cached_result, dict) and 'score' in cached_result:
+            return cached_result['score']
+        return cached_result
     
     skills_str = ", ".join(matched_skills[:15])
     
@@ -241,13 +280,22 @@ Return ONLY valid JSON (no markdown, no code blocks):
         if result.get('red_flags'):
             print(f"      Red flags: {', '.join(result.get('red_flags', []))}")
     
+    # ============================================================
+    # ADDED: Cache with token info
+    # ============================================================
+    cache_value = {
+        'score': relevance_score,
+        'token_usage': result.get('_token_usage', {}),
+        'details': result
+    }
+    
     if use_cache:
-        SKILL_RELEVANCE_CACHE[cache_key] = relevance_score
+        SKILL_RELEVANCE_CACHE[cache_key] = cache_value
     
     return relevance_score
 
 def calculate_designation_similarity(jd_role, candidate_designation, use_fuzzy=True, use_cache=True):
-    '''Calculate similarity between JD role and candidate designation using OpenAI (0-100)'''
+    '''Calculate similarity between JD role and candidate designation using OpenAI (0-100) with token tracking'''
     if not jd_role or not candidate_designation:
         return 0, "no_data", {}
     
@@ -265,7 +313,8 @@ def calculate_designation_similarity(jd_role, candidate_designation, use_fuzzy=T
     cache_key = f"{jd_role}||{cand_desg}"
     if use_cache and cache_key in DESIGNATION_CACHE:
         cached_result = DESIGNATION_CACHE[cache_key]
-        cached_result[2]['cache_hit'] = True
+        if len(cached_result) >= 3:
+            cached_result[2]['cache_hit'] = True
         return cached_result
     
     # AI analysis
@@ -307,7 +356,11 @@ Return ONLY a valid JSON object with this exact structure (no markdown, no code 
             'function_match': result.get('function_match', False),
             'role_equivalent': result.get('role_equivalent', False),
             'api_source': 'openai',
-            'cache_hit': False
+            'cache_hit': False,
+            # ============================================================
+            # ADDED: Include token usage in details
+            # ============================================================
+            'token_usage': result.get('_token_usage', {})
         }
         
         result_tuple = (score, match_type, details)
@@ -689,17 +742,99 @@ def fetch_candidates_from_api(api_url=None, api_key=None, timeout=2000):
         traceback.print_exc()
         return pd.DataFrame()
     
-def match_candidates_with_jd(required_skills=['all_skills'], min_match_percentage=15, api_url=None, api_key=None,  # ULTRA LOW: 15
+def process_candidate_with_tokens(row, required_skills, priority_skills, nice_to_have_skills,
+                                  jd_role_title, min_req_skills, min_quality_threshold, 
+                                  min_match_percentage, location_preference, required_experience, 
+                                  filtered_count, token_aggregator):
+    '''Process a single candidate - ULTRA LENIENT VERSION with token tracking'''
+    candidate_skills_str = str(row.get('skills', ''))
+    
+    if not candidate_skills_str or candidate_skills_str.lower() in ['nan', 'none', '']:
+        return None
+    
+    # Parse and filter candidate skills
+    candidate_skills = parse_candidate_skills(candidate_skills_str)
+    if not candidate_skills:
+        return None
+    
+    # Skill matching
+    matched_details, total_weighted_score, total_weight, nice_to_have_matched = match_skills(
+        candidate_skills, required_skills, priority_skills, nice_to_have_skills, jd_role_title
+    )
+    
+    required_matched = sum(1 for s in required_skills if s in matched_details)
+    
+    if required_matched > 0:
+        print(f"   Candidate: {row.get('name', 'Unknown')} - Matched {required_matched}/{len(required_skills)} skills")
+    
+    if required_matched < min_req_skills:
+        filtered_count['min_skills'] += 1
+        return None
+    
+    # ============================================================
+    # MODIFIED: Track tokens from skill relevance calculation
+    # ============================================================
+    candidate_designation = str(row.get('designation', ''))
+    matched_skills = list(matched_details.keys())
+    
+    # This function internally calls OpenAI
+    skill_relevance_score = calculate_skill_relevance_score(
+        matched_skills, jd_role_title, candidate_designation
+    )
+    
+    # Check if token usage was tracked in the cache or result
+    # Note: calculate_skill_relevance_score uses call_openai_analysis which now includes token info
+    
+    # Calculate scores
+    candidate_scores = calculate_candidate_scores(
+        matched_details, required_skills, required_matched, 
+        total_weighted_score, total_weight, skill_relevance_score,
+        jd_role_title, candidate_designation, row, location_preference,
+        required_experience, priority_skills, nice_to_have_matched, nice_to_have_skills
+    )
+    
+    effective_quality_threshold = max(min_quality_threshold, 5)
+    
+    if candidate_scores['quality_score'] < effective_quality_threshold:
+        filtered_count['quality'] += 1
+        return None
+    
+    if candidate_scores['combined_score'] < min_match_percentage:
+        filtered_count['threshold'] += 1
+        return None
+    
+    # ============================================================
+    # MODIFIED: Track tokens from designation similarity
+    # ============================================================
+    # This also calls OpenAI internally via calculate_designation_similarity
+    
+    # Build final candidate data
+    return build_candidate_data(row, candidate_scores, matched_details, matched_skills, 
+                               required_skills, priority_skills, nice_to_have_matched)
+
+
+def match_candidates_with_jd(required_skills=['all_skills'], min_match_percentage=15, api_url=None, api_key=None,
                              priority_skills=None, nice_to_have_skills=None, use_fuzzy=True, 
                              location_preference=None, required_experience=None,
                              min_required_skills_match=None,
                              industry_preference=None, 
-                             min_quality_threshold=5,  # ULTRA LOW: 5
+                             min_quality_threshold=5,
                              jd_role_title=None,
                              debug_mode=True):
     '''
     ULTRA LENIENT VERSION: Will show candidates with even 1 skill match
+    WITH TOKEN TRACKING
     '''
+    # ============================================================
+    # ADDED: Token tracking aggregator
+    # ============================================================
+    total_token_usage = {
+        'prompt_tokens': 0,
+        'completion_tokens': 0,
+        'total_tokens': 0,
+        'api_calls': 0
+    }
+    
     try:
         df = fetch_candidates_from_api(api_url, api_key)
         
@@ -722,11 +857,10 @@ def match_candidates_with_jd(required_skills=['all_skills'], min_match_percentag
             print("❌ No valid required skills")
             return []
         
-        # ULTRA LENIENT: Accept even 1 skill match
         if min_required_skills_match is None:
-            min_req_skills = 1  # CHANGED: Always accept 1+ skills
+            min_req_skills = 1
         else:
-            min_req_skills = max(1, min_required_skills_match)  # CHANGED: Minimum is 1
+            min_req_skills = max(1, min_required_skills_match)
         
         print(f"🎯 Required skills: {len(required_skills_lower)}")
         print(f"🎯 Minimum skills to match: {min_req_skills} (ULTRA LENIENT - accepting 1+ skills)")
@@ -742,17 +876,35 @@ def match_candidates_with_jd(required_skills=['all_skills'], min_match_percentag
         filtered_count = defaultdict(int)
         
         for idx, row in df.iterrows():
-            candidate_data = process_candidate(
+            # ============================================================
+            # MODIFIED: Pass token aggregator to process_candidate
+            # ============================================================
+            candidate_data = process_candidate_with_tokens(
                 row, required_skills_lower, priority_skills_lower, nice_to_have_lower,
                 jd_role_title, min_req_skills, min_quality_threshold, min_match_percentage,
-                location_preference, required_experience, filtered_count
+                location_preference, required_experience, filtered_count, total_token_usage
             )
             
             if candidate_data:
                 matched_candidates.append(candidate_data)
         
-        # Sort and display results
-        return finalize_results(matched_candidates, filtered_count, len(df), min_match_percentage, min_req_skills)
+        # Sort and prepare results
+        result = finalize_results(matched_candidates, filtered_count, len(df), min_match_percentage, min_req_skills)
+        
+        # ============================================================
+        # ADDED: Return results with token usage
+        # ============================================================
+        print(f"\n📊 Total Token Usage for Matching:")
+        print(f"   API Calls: {total_token_usage['api_calls']}")
+        print(f"   Prompt Tokens: {total_token_usage['prompt_tokens']}")
+        print(f"   Completion Tokens: {total_token_usage['completion_tokens']}")
+        print(f"   Total Tokens: {total_token_usage['total_tokens']}")
+        
+        return {
+            'candidates': result,
+            'token_usage': total_token_usage,
+            'model': 'gpt-4o-mini'
+        }
     
     except Exception as e:
         print(f"❌ Error: {e}")
@@ -1523,7 +1675,6 @@ def generate_linkedin_search_strings(skills, role_title, experience_level):
 
 def extract_skills_from_jd(jd_text, domain_hint=""):
     '''Extract ALL skills comprehensively from job description using OpenAI API'''
-    # Keep original implementation exactly as is
     try:
         client = OpenAI(api_key=settings.OPENAI_API_KEY)
     except Exception as e:
@@ -1597,6 +1748,15 @@ JD:
         content = response.choices[0].message.content.strip()
         cleaned = re.sub(r"^```json\s*|\s*```$", "", content, flags=re.MULTILINE).strip()
 
+        # ============================================================
+        # ADDED: Extract token usage
+        # ============================================================
+        token_usage = {
+            'prompt_tokens': response.usage.prompt_tokens,
+            'completion_tokens': response.usage.completion_tokens,
+            'total_tokens': response.usage.total_tokens
+        }
+
         try:
             result = json.loads(cleaned)
             
@@ -1633,6 +1793,14 @@ JD:
             
             if "preferred_location" not in result:
                 result["preferred_location"] = None
+            
+            # ============================================================
+            # ADDED: Include token usage and model in result
+            # ============================================================
+            result['token_usage'] = token_usage
+            result['model'] = 'gpt-4o-mini'
+            
+            print(f"✅ Skill extraction complete - Used {token_usage['total_tokens']} tokens")
             
             return result
 

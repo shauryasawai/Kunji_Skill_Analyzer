@@ -410,3 +410,16 @@ class APIConfiguration(models.Model):
         if self.total_requests == 0:
             return 0
         return (self.total_successful_requests / self.total_requests) * 100
+    
+class TokenUsageLog(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    operation = models.CharField(max_length=100)
+    prompt_tokens = models.IntegerField()
+    completion_tokens = models.IntegerField()
+    total_tokens = models.IntegerField()
+    model = models.CharField(max_length=50)
+    cost = models.DecimalField(max_digits=10, decimal_places=4)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-created_at']

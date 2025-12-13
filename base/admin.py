@@ -2,9 +2,12 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.urls import reverse
 from django.utils import timezone
-from django.db.models import Count, Avg, Max
-from .models import JobDescription, MatchingHistory, APIConfiguration
+from django.db.models import Count, Avg, Max, Sum
+from .models import JobDescription, MatchingHistory, APIConfiguration, TokenUsageLog
 import json
+from django.utils.timezone import now
+from datetime import timedelta
+
 
 @admin.register(JobDescription)
 class JobDescriptionAdmin(admin.ModelAdmin):
@@ -348,6 +351,239 @@ class MatchingHistoryAdmin(admin.ModelAdmin):
     def has_add_permission(self, request):
         """Disable manual creation"""
         return False
+
+
+@admin.register(TokenUsageLog)
+class TokenUsageLogAdmin(admin.ModelAdmin):
+    list_display = [
+        'id',
+        'user_link',
+        'operation_badge',
+        'total_tokens_display',
+        'cost_display',
+        'model',
+        'created_at_display',
+    ]
+    
+    list_filter = [
+        'operation',
+        'model',
+        'created_at',
+        'user',
+    ]
+    
+    search_fields = [
+        'user__username',
+        'user__email',
+        'operation',
+        'model',
+    ]
+    
+    readonly_fields = [
+        'user',
+        'operation',
+        'prompt_tokens',
+        'completion_tokens',
+        'total_tokens',
+        'model',
+        'cost',
+        'created_at',
+        'token_breakdown_display',
+    ]
+    
+    date_hierarchy = 'created_at'
+    
+    ordering = ['-created_at']
+    
+    list_per_page = 50
+    
+    fieldsets = (
+        ('User Information', {
+            'fields': ('user', 'operation', 'created_at')
+        }),
+        ('Token Usage', {
+            'fields': ('prompt_tokens', 'completion_tokens', 'total_tokens', 'token_breakdown_display')
+        }),
+        ('Cost Information', {
+            'fields': ('model', 'cost')
+        }),
+    )
+    
+    def user_link(self, obj):
+        """Display username as a link to user's token logs"""
+        url = reverse('admin:base_tokenusagelog_changelist') + f'?user__id__exact={obj.user.id}'
+        return format_html('<a href="{}">{}</a>', url, obj.user.username)
+    user_link.short_description = 'User'
+    
+    def operation_badge(self, obj):
+        """Display operation with colored badge"""
+        colors = {
+            'skill_extraction': '#3B82F6',  # blue
+            'candidate_matching': '#10B981',  # green
+            'designation_similarity': '#F59E0B',  # yellow
+            'skill_relevance': '#8B5CF6',  # purple
+        }
+        
+        color = colors.get(obj.operation, '#6B7280')  # default gray
+        
+        return format_html(
+            '<span style="background-color: {}; color: white; padding: 4px 12px; '
+            'border-radius: 12px; font-size: 12px; font-weight: 600;">{}</span>',
+            color,
+            obj.operation.replace('_', ' ').title()
+        )
+    operation_badge.short_description = 'Operation'
+    
+    def total_tokens_display(self, obj):
+        """Display total tokens with formatting"""
+        return format_html(
+            '<span style="font-weight: 600; color: #1F2937;">{}</span> '
+            '<span style="color: #6B7280; font-size: 11px;">(↑{} ↓{})</span>',
+            f"{obj.total_tokens:,}",
+            f"{obj.prompt_tokens:,}",
+            f"{obj.completion_tokens:,}"
+        )
+    total_tokens_display.short_description = 'Total Tokens'
+    
+    def cost_display(self, obj):
+        """Display cost with formatting"""
+        # Convert DecimalField to float for comparison
+        cost_float = float(obj.cost)
+        color = '#DC2626' if cost_float > 0.1 else '#10B981' if cost_float < 0.01 else '#F59E0B'
+        
+        return format_html(
+            '<span style="font-weight: 600; color: {};">${}</span>',
+            color,
+            f"{cost_float:.4f}"
+        )
+    cost_display.short_description = 'Cost (USD)'
+    
+    def created_at_display(self, obj):
+        """Display created_at with relative time"""
+        from django.utils.timesince import timesince
+        
+        return format_html(
+            '{}<br><span style="color: #6B7280; font-size: 11px;">{} ago</span>',
+            obj.created_at.strftime('%Y-%m-%d %H:%M'),
+            timesince(obj.created_at)
+        )
+    created_at_display.short_description = 'Created At'
+    
+    def token_breakdown_display(self, obj):
+        """Display detailed token breakdown"""
+        prompt_pct = (obj.prompt_tokens / obj.total_tokens * 100) if obj.total_tokens > 0 else 0
+        completion_pct = (obj.completion_tokens / obj.total_tokens * 100) if obj.total_tokens > 0 else 0
+        cost_float = float(obj.cost)
+        
+        return format_html(
+            '<div style="font-family: monospace;">'
+            '<div><strong>Prompt Tokens:</strong> {} ({}%)</div>'
+            '<div><strong>Completion Tokens:</strong> {} ({}%)</div>'
+            '<div><strong>Total Tokens:</strong> {}</div>'
+            '<div style="margin-top:12px;">'
+            '<strong>Total Cost:</strong> ${}</div>'
+            '</div>',
+            f"{obj.prompt_tokens:,}",
+            f"{prompt_pct:.1f}",
+            f"{obj.completion_tokens:,}",
+            f"{completion_pct:.1f}",
+            f"{obj.total_tokens:,}",
+            f"{cost_float:.4f}"
+        )
+    token_breakdown_display.short_description = 'Token Breakdown'
+    
+    def changelist_view(self, request, extra_context=None):
+        """Add summary statistics to the changelist view"""
+        extra_context = extra_context or {}
+        
+        # Get date range for stats
+        thirty_days_ago = now() - timedelta(days=30)
+        seven_days_ago = now() - timedelta(days=7)
+        today = now().replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        # Calculate stats - convert Decimal to float for display
+        stats_30_days_raw = TokenUsageLog.objects.filter(
+            created_at__gte=thirty_days_ago
+        ).aggregate(
+            sum_tokens=Sum('total_tokens'),
+            total_cost=Sum('cost'),
+            total_operations=Count('id'),
+            avg_tokens=Avg('total_tokens'),
+            unique_users=Count('user', distinct=True)
+        )
+        
+        # Convert Decimal to float
+        stats_30_days = {
+            'sum_tokens': stats_30_days_raw['sum_tokens'] or 0,
+            'total_cost': float(stats_30_days_raw['total_cost'] or 0),
+            'total_operations': stats_30_days_raw['total_operations'] or 0,
+            'avg_tokens': stats_30_days_raw['avg_tokens'] or 0,
+            'unique_users': stats_30_days_raw['unique_users'] or 0
+        }
+        
+        stats_7_days_raw = TokenUsageLog.objects.filter(
+            created_at__gte=seven_days_ago
+        ).aggregate(
+            total_tokens=Sum('total_tokens'),
+            total_cost=Sum('cost'),
+        )
+        
+        stats_7_days = {
+            'total_tokens': stats_7_days_raw['total_tokens'] or 0,
+            'total_cost': float(stats_7_days_raw['total_cost'] or 0)
+        }
+        
+        stats_today_raw = TokenUsageLog.objects.filter(
+            created_at__gte=today
+        ).aggregate(
+            total_tokens=Sum('total_tokens'),
+            total_cost=Sum('cost'),
+        )
+        
+        stats_today = {
+            'total_tokens': stats_today_raw['total_tokens'] or 0,
+            'total_cost': float(stats_today_raw['total_cost'] or 0)
+        }
+        
+        # Operation breakdown - convert Decimal to float
+        operation_stats_raw = TokenUsageLog.objects.filter(
+            created_at__gte=thirty_days_ago
+        ).values('operation').annotate(
+            total_tokens_calc=Sum('total_tokens'),
+            total_cost=Sum('cost'),
+            count=Count('id')
+        ).order_by('-total_tokens_calc')
+        
+        operation_stats = [
+            {
+                'operation': stat['operation'],
+                'total_tokens_calc': stat['total_tokens_calc'],
+                'total_cost': float(stat['total_cost'] or 0),
+                'count': stat['count']
+            }
+            for stat in operation_stats_raw
+        ]
+        
+        extra_context.update({
+            'stats_30_days': stats_30_days,
+            'stats_7_days': stats_7_days,
+            'stats_today': stats_today,
+            'operation_stats': operation_stats,
+        })
+        
+        return super().changelist_view(request, extra_context=extra_context)
+    
+    def has_add_permission(self, request):
+        """Disable manual addition of token logs"""
+        return False
+    
+    def has_delete_permission(self, request, obj=None):
+        """Allow deletion only for superusers"""
+        return request.user.is_superuser
+    
+    class Meta:
+        verbose_name = "Token Usage Log"
+        verbose_name_plural = "Token Usage Logs"
 
 
 @admin.register(APIConfiguration)
