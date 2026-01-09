@@ -11,7 +11,8 @@
                         <p class="text-muted mb-0">Job: <strong>{{ jd.title }}</strong></p>
                     </div>
                     <div>
-                        <span class="badge bg-success fs-5">{{ total_matches }} Matches</span>
+                        <span class="badge bg-success fs-5">{{ total_matches }} Total Matches</span>
+                        <span class="badge bg-primary fs-5 ms-2">Showing {{ matched_candidates|length }}</span>
                     </div>
                 </div>
                 
@@ -27,48 +28,126 @@
                 <hr>
                 
                 {% if matched_candidates %}
-                <!-- Search and Filter Section -->
-                <div class="card mb-4 bg-light">
-                    <div class="card-body">
+                <!-- Enhanced Search and Filter Section -->
+                <div class="card mb-4 shadow-sm" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                    <div class="card-body p-4">
+                        <h5 class="text-white mb-4">🔍 Advanced Search & Filters</h5>
+                        
                         <div class="row g-3">
-                            <div class="col-md-4">
-                                <label for="searchName" class="form-label">🔍 Search by Name</label>
+                            <!-- Name Search -->
+                            <div class="col-md-3">
+                                <label for="searchName" class="form-label text-white">👤 Search by Name</label>
                                 <input type="text" class="form-control" id="searchName" placeholder="Enter candidate name...">
                             </div>
-                            <div class="col-md-4">
-                                <label for="filterLocation" class="form-label">📍 Filter by Location</label>
+                            
+                            <!-- Location Filter -->
+                            <div class="col-md-3">
+                                <label for="filterLocation" class="form-label text-white">📍 Filter by Location</label>
                                 <input type="text" class="form-control" id="filterLocation" placeholder="Enter location...">
                             </div>
-                            <div class="col-md-4">
-                                <label for="sortBy" class="form-label">⚡ Sort By</label>
+                            
+                            <!-- Company Filter (NEW) -->
+                            <div class="col-md-3">
+                                <label for="filterCompany" class="form-label text-white">🏢 Filter by Company</label>
+                                <input type="text" class="form-control" id="filterCompany" placeholder="Enter company name...">
+                            </div>
+                            
+                            <!-- Keyword Filter (NEW) -->
+                            <div class="col-md-3">
+                                <label for="filterKeyword" class="form-label text-white">🔎 Keyword Search</label>
+                                <input type="text" class="form-control" id="filterKeyword" placeholder="Skills, title, etc...">
+                            </div>
+                        </div>
+                        
+                        <div class="row g-3 mt-2">
+                            <!-- Minimum Match % -->
+                            <div class="col-md-3">
+                                <label for="minMatch" class="form-label text-white">📊 Min Match %</label>
+                                <input type="number" class="form-control" id="minMatch" placeholder="e.g., 70" min="0" max="100">
+                            </div>
+                            
+                            <!-- Experience Range -->
+                            <div class="col-md-3">
+                                <label for="minExperience" class="form-label text-white">⏱️ Min Experience (years)</label>
+                                <input type="number" class="form-control" id="minExperience" placeholder="e.g., 5" min="0">
+                            </div>
+                            
+                            <!-- Sort By -->
+                            <div class="col-md-3">
+                                <label for="sortBy" class="form-label text-white">⚡ Sort By</label>
                                 <select class="form-select" id="sortBy">
                                     <option value="match">Match % (High to Low)</option>
+                                    <option value="matchLow">Match % (Low to High)</option>
                                     <option value="location">Location Proximity</option>
                                     <option value="name">Name (A-Z)</option>
-                                    <option value="experience">Experience</option>
+                                    <option value="experience">Experience (High to Low)</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Results per page (NEW) -->
+                            <div class="col-md-3">
+                                <label for="resultsPerPage" class="form-label text-white">📄 Results Per Page</label>
+                                <select class="form-select" id="resultsPerPage">
+                                    <option value="50">50 results</option>
+                                    <option value="100">100 results</option>
+                                    <option value="200" selected>200 results</option>
+                                    <option value="500">500 results</option>
+                                    <option value="all">Show All</option>
                                 </select>
                             </div>
                         </div>
-                        <div class="mt-3">
-                            <button class="btn btn-sm btn-primary" id="applyFilters">Apply Filters</button>
-                            <button class="btn btn-sm btn-outline-secondary" id="resetFilters">Reset</button>
-                            <span class="ms-3 text-muted" id="resultCount">Showing {{ matched_candidates|length }} candidates</span>
+                        
+                        <div class="mt-4 d-flex justify-content-between align-items-center">
+                            <div>
+                                <button class="btn btn-light btn-lg me-2" id="applyFilters">
+                                    🎯 Apply Filters
+                                </button>
+                                <button class="btn btn-outline-light btn-lg" id="resetFilters">
+                                    🔄 Reset All
+                                </button>
+                            </div>
+                            <div>
+                                <span class="badge bg-light text-dark fs-6 p-2" id="resultCount">
+                                    Showing {{ matched_candidates|length }} candidates
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <!-- Active Filters Display -->
+                        <div id="activeFilters" class="mt-3" style="display: none;">
+                            <div class="p-3" style="background: rgba(255,255,255,0.2); border-radius: 8px;">
+                                <strong class="text-white">Active Filters:</strong>
+                                <div class="mt-2" id="filterBadges"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
+                <!-- Pagination Controls (NEW) -->
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <button class="btn btn-outline-primary" id="prevPage" disabled>← Previous</button>
+                        <span class="mx-3 fw-bold" id="pageInfo">Page 1</span>
+                        <button class="btn btn-outline-primary" id="nextPage">Next →</button>
+                    </div>
+                    <div class="text-muted">
+                        <span id="pageRange"></span>
+                    </div>
+                </div>
+
                 <div class="table-responsive">
-                    <table class="table table-hover" id="candidatesTable">
-                        <thead class="table-dark">
+                    <table class="table table-hover table-striped" id="candidatesTable">
+                        <thead class="table-dark sticky-top">
                             <tr>
-                                <th>Match %</th>
-                                <th>Name</th>
-                                <th>Designation</th>
-                                <th>Qualifications</th>
-                                <th>Experience</th>
-                                <th>Location</th>
-                                <th>Matched Skills</th>
-                                <th>Contact</th>
+                                <th style="min-width: 100px;">Match %</th>
+                                <th style="min-width: 180px;">Name</th>
+                                <th style="min-width: 150px;">Designation</th>
+                                <th style="min-width: 150px;">Company</th>
+                                <th style="min-width: 120px;">Qualifications</th>
+                                <th style="min-width: 100px;">Experience</th>
+                                <th style="min-width: 150px;">Location</th>
+                                <th style="min-width: 120px;">Matched Skills</th>
+                                <th style="min-width: 180px;">Contact</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -76,10 +155,13 @@
                             <tr class="candidate-row" 
                                 data-name="{{ candidate.name|lower }}" 
                                 data-location="{{ candidate.location|lower }}"
+                                data-company="{{ candidate.company|default:''|lower }}"
+                                data-designation="{{ candidate.designation|default:''|lower }}"
+                                data-skills="{{ candidate.skills|default:''|lower }}"
                                 data-match="{{ candidate.match_percentage }}"
                                 data-experience="{{ candidate.experience|default:'0' }}">
                                 <td>
-                                    <div class="progress" style="width: 60px; height: 30px;">
+                                    <div class="progress" style="width: 70px; height: 32px;">
                                         <div class="progress-bar 
                                             {% if candidate.match_percentage >= 80 %}bg-success
                                             {% elif candidate.match_percentage >= 60 %}bg-info
@@ -90,20 +172,21 @@
                                             aria-valuenow="{{ candidate.match_percentage }}"
                                             aria-valuemin="0"
                                             aria-valuemax="100">
-                                            <strong>{{ candidate.match_percentage }}%</strong>
+                                            <strong style="font-size: 11px;">{{ candidate.match_percentage }}%</strong>
                                         </div>
                                     </div>
-                                    <small class="text-muted">{{ candidate.matched_skills_count }}/{{ candidate.total_required_skills }}</small>
+                                    <small class="text-muted d-block mt-1">{{ candidate.matched_skills_count }}/{{ candidate.total_required_skills }}</small>
                                 </td>
                                 <td>
-                                    <strong>{{ candidate.name|default:"N/A" }}</strong>
+                                    <strong class="name-cell">{{ candidate.name|default:"N/A" }}</strong>
                                     {% if candidate.linkedin and candidate.linkedin != 'N/A' %}
                                         <br><a href="{{ candidate.linkedin }}" target="_blank" rel="noopener noreferrer" class="text-primary">
                                             <small>🔗 LinkedIn</small>
                                         </a>
                                     {% endif %}
                                 </td>
-                                <td>{{ candidate.designation|default:"N/A" }}</td>
+                                <td class="designation-cell">{{ candidate.designation|default:"N/A" }}</td>
+                                <td class="company-cell">{{ candidate.company|default:"N/A" }}</td>
                                 <td>{{ candidate.qualification|default:"N/A" }}</td>
                                 <td>{{ candidate.experience|default:"N/A" }}</td>
                                 <td>
@@ -161,15 +244,22 @@
                     </table>
                 </div>
 
-                <div id="noResults" class="alert alert-warning text-center" style="display: none;">
-                    No candidates found matching your search criteria.
+                <!-- Pagination Controls Bottom -->
+                <div class="d-flex justify-content-between align-items-center mt-3">
+                    <div>
+                        <button class="btn btn-outline-primary" id="prevPageBottom" disabled>← Previous</button>
+                        <span class="mx-3 fw-bold" id="pageInfoBottom">Page 1</span>
+                        <button class="btn btn-outline-primary" id="nextPageBottom">Next →</button>
+                    </div>
+                    <div class="text-muted">
+                        <span id="pageRangeBottom"></span>
+                    </div>
                 </div>
-                
-                {% if total_matches > 50 %}
-                <div class="alert alert-info">
-                    <strong>Note:</strong> Showing first 50 matches. Download the full Excel report to see all {{ total_matches }} candidates.
+
+                <div id="noResults" class="alert alert-warning text-center mt-4" style="display: none;">
+                    <h5>⚠️ No candidates found matching your search criteria.</h5>
+                    <p class="mb-0">Try adjusting your filters or reset to see all candidates.</p>
                 </div>
-                {% endif %}
                 
                 {% else %}
                 <div class="alert alert-warning text-center">
@@ -177,9 +267,9 @@
                 </div>
                 {% endif %}
                 
-                <div class="d-flex justify-content-between mt-4">
-                    <a href="{% url 'results' jd.pk %}" class="btn btn-secondary">← Back to JD Analysis</a>
-                    <a href="{% url 'upload_jd' %}" class="btn btn-outline-primary">Analyze Another JD</a>
+                <div class="d-flex justify-content-between mt-5">
+                    <a href="{% url 'results' jd.pk %}" class="btn btn-secondary btn-lg">← Back to JD Analysis</a>
+                    <a href="{% url 'upload_jd' %}" class="btn btn-outline-primary btn-lg">Analyze Another JD</a>
                 </div>
             </div>
         </div>
@@ -188,15 +278,40 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Filter inputs
     const searchName = document.getElementById('searchName');
     const filterLocation = document.getElementById('filterLocation');
+    const filterCompany = document.getElementById('filterCompany');
+    const filterKeyword = document.getElementById('filterKeyword');
+    const minMatch = document.getElementById('minMatch');
+    const minExperience = document.getElementById('minExperience');
     const sortBy = document.getElementById('sortBy');
+    const resultsPerPage = document.getElementById('resultsPerPage');
     const applyFilters = document.getElementById('applyFilters');
     const resetFilters = document.getElementById('resetFilters');
+    
+    // Display elements
     const resultCount = document.getElementById('resultCount');
     const noResults = document.getElementById('noResults');
+    const activeFilters = document.getElementById('activeFilters');
+    const filterBadges = document.getElementById('filterBadges');
+    
+    // Pagination elements
+    const prevPage = document.getElementById('prevPage');
+    const nextPage = document.getElementById('nextPage');
+    const pageInfo = document.getElementById('pageInfo');
+    const pageRange = document.getElementById('pageRange');
+    const prevPageBottom = document.getElementById('prevPageBottom');
+    const nextPageBottom = document.getElementById('nextPageBottom');
+    const pageInfoBottom = document.getElementById('pageInfoBottom');
+    const pageRangeBottom = document.getElementById('pageRangeBottom');
+    
+    // Data
     const candidateRows = Array.from(document.querySelectorAll('.candidate-row'));
     const tbody = document.querySelector('#candidatesTable tbody');
+    
+    let currentPage = 1;
+    let filteredRows = [...candidateRows];
 
     // Location proximity checker
     function isNearbyLocation(candidateLocation, searchLocation) {
@@ -205,14 +320,11 @@ document.addEventListener('DOMContentLoaded', function() {
         candidateLocation = candidateLocation.toLowerCase().trim();
         searchLocation = searchLocation.toLowerCase().trim();
         
-        // Exact match
         if (candidateLocation.includes(searchLocation)) return true;
         
-        // Split by comma and check each part (city, state, country)
         const candidateParts = candidateLocation.split(',').map(p => p.trim());
         const searchParts = searchLocation.split(',').map(p => p.trim());
         
-        // Check if any part matches
         for (let searchPart of searchParts) {
             for (let candidatePart of candidateParts) {
                 if (candidatePart.includes(searchPart) || searchPart.includes(candidatePart)) {
@@ -224,27 +336,70 @@ document.addEventListener('DOMContentLoaded', function() {
         return false;
     }
 
+    // Show active filters
+    function updateActiveFilters() {
+        const filters = [];
+        
+        if (searchName.value.trim()) filters.push(`Name: ${searchName.value}`);
+        if (filterLocation.value.trim()) filters.push(`Location: ${filterLocation.value}`);
+        if (filterCompany.value.trim()) filters.push(`Company: ${filterCompany.value}`);
+        if (filterKeyword.value.trim()) filters.push(`Keyword: ${filterKeyword.value}`);
+        if (minMatch.value.trim()) filters.push(`Min Match: ${minMatch.value}%`);
+        if (minExperience.value.trim()) filters.push(`Min Exp: ${minExperience.value} years`);
+        
+        if (filters.length > 0) {
+            filterBadges.innerHTML = filters.map(f => 
+                `<span class="badge bg-light text-dark me-2 mb-2">${f}</span>`
+            ).join('');
+            activeFilters.style.display = 'block';
+        } else {
+            activeFilters.style.display = 'none';
+        }
+    }
+
     function applyFiltersFunc() {
         const nameQuery = searchName.value.toLowerCase().trim();
         const locationQuery = filterLocation.value.toLowerCase().trim();
+        const companyQuery = filterCompany.value.toLowerCase().trim();
+        const keywordQuery = filterKeyword.value.toLowerCase().trim();
+        const minMatchValue = parseFloat(minMatch.value) || 0;
+        const minExpValue = parseFloat(minExperience.value) || 0;
         const sortValue = sortBy.value;
         
-        let visibleRows = candidateRows.filter(row => {
+        // Filter rows
+        filteredRows = candidateRows.filter(row => {
             const name = row.getAttribute('data-name');
             const location = row.getAttribute('data-location');
+            const company = row.getAttribute('data-company');
+            const designation = row.getAttribute('data-designation');
+            const skills = row.getAttribute('data-skills');
+            const matchPerc = parseFloat(row.getAttribute('data-match'));
+            const experience = parseFloat(row.getAttribute('data-experience')) || 0;
             
             const nameMatch = !nameQuery || name.includes(nameQuery);
             const locationMatch = isNearbyLocation(location, locationQuery);
+            const companyMatch = !companyQuery || company.includes(companyQuery);
             
-            return nameMatch && locationMatch;
+            // Keyword search across multiple fields
+            const keywordMatch = !keywordQuery || 
+                name.includes(keywordQuery) ||
+                company.includes(keywordQuery) ||
+                designation.includes(keywordQuery) ||
+                skills.includes(keywordQuery);
+            
+            const matchFilter = matchPerc >= minMatchValue;
+            const expFilter = experience >= minExpValue;
+            
+            return nameMatch && locationMatch && companyMatch && keywordMatch && matchFilter && expFilter;
         });
 
-        // Sort the visible rows
-        visibleRows.sort((a, b) => {
+        // Sort the filtered rows
+        filteredRows.sort((a, b) => {
             if (sortValue === 'match') {
                 return parseFloat(b.getAttribute('data-match')) - parseFloat(a.getAttribute('data-match'));
+            } else if (sortValue === 'matchLow') {
+                return parseFloat(a.getAttribute('data-match')) - parseFloat(b.getAttribute('data-match'));
             } else if (sortValue === 'location') {
-                // Prioritize exact matches, then nearby
                 const locA = a.getAttribute('data-location');
                 const locB = b.getAttribute('data-location');
                 if (locationQuery) {
@@ -256,38 +411,83 @@ document.addEventListener('DOMContentLoaded', function() {
             } else if (sortValue === 'name') {
                 return a.getAttribute('data-name').localeCompare(b.getAttribute('data-name'));
             } else if (sortValue === 'experience') {
-                const expA = parseInt(a.getAttribute('data-experience')) || 0;
-                const expB = parseInt(b.getAttribute('data-experience')) || 0;
+                const expA = parseFloat(a.getAttribute('data-experience')) || 0;
+                const expB = parseFloat(b.getAttribute('data-experience')) || 0;
                 return expB - expA;
             }
             return 0;
         });
 
-        // Hide all rows first
+        // Update active filters display
+        updateActiveFilters();
+        
+        // Reset to page 1
+        currentPage = 1;
+        displayPage();
+    }
+
+    function displayPage() {
+        const perPage = resultsPerPage.value === 'all' ? filteredRows.length : parseInt(resultsPerPage.value);
+        const totalPages = Math.ceil(filteredRows.length / perPage);
+        const start = (currentPage - 1) * perPage;
+        const end = start + perPage;
+        
+        // Hide all rows
         candidateRows.forEach(row => row.style.display = 'none');
         
-        // Show filtered and sorted rows
-        visibleRows.forEach(row => {
-            tbody.appendChild(row); // Re-append to maintain sort order
+        // Show current page rows
+        const pageRows = filteredRows.slice(start, end);
+        pageRows.forEach(row => {
+            tbody.appendChild(row);
             row.style.display = '';
         });
 
-        // Update result count and show/hide no results message
-        const visibleCount = visibleRows.length;
-        resultCount.textContent = `Showing ${visibleCount} candidate${visibleCount !== 1 ? 's' : ''}`;
+        // Update pagination controls
+        const pageText = resultsPerPage.value === 'all' ? 'All Results' : `Page ${currentPage} of ${totalPages}`;
+        const rangeText = `Showing ${start + 1}-${Math.min(end, filteredRows.length)} of ${filteredRows.length}`;
         
-        if (visibleCount === 0) {
+        pageInfo.textContent = pageText;
+        pageInfoBottom.textContent = pageText;
+        pageRange.textContent = rangeText;
+        pageRangeBottom.textContent = rangeText;
+        
+        prevPage.disabled = currentPage === 1 || resultsPerPage.value === 'all';
+        nextPage.disabled = currentPage >= totalPages || resultsPerPage.value === 'all';
+        prevPageBottom.disabled = prevPage.disabled;
+        nextPageBottom.disabled = nextPage.disabled;
+        
+        // Update result count
+        resultCount.textContent = `Showing ${filteredRows.length} candidate${filteredRows.length !== 1 ? 's' : ''}`;
+        
+        // Show/hide no results message
+        if (filteredRows.length === 0) {
             noResults.style.display = 'block';
         } else {
             noResults.style.display = 'none';
         }
 
-        // Highlight nearby locations if location filter is active
+        // Highlight matching text
+        highlightMatches();
+    }
+
+    function highlightMatches() {
+        const companyQuery = filterCompany.value.trim();
+        const locationQuery = filterLocation.value.trim();
+        
+        if (companyQuery) {
+            document.querySelectorAll('.company-cell').forEach(cell => {
+                const text = cell.textContent;
+                if (text.toLowerCase().includes(companyQuery.toLowerCase())) {
+                    cell.innerHTML = `<span class="badge bg-warning text-dark">${text}</span>`;
+                }
+            });
+        }
+        
         if (locationQuery) {
             document.querySelectorAll('.location-cell').forEach(cell => {
-                const location = cell.textContent.toLowerCase();
-                if (isNearbyLocation(location, locationQuery)) {
-                    cell.innerHTML = `<span class="badge bg-info">${cell.textContent}</span>`;
+                const location = cell.textContent;
+                if (isNearbyLocation(location.toLowerCase(), locationQuery.toLowerCase())) {
+                    cell.innerHTML = `<span class="badge bg-info">${location}</span>`;
                 }
             });
         }
@@ -296,46 +496,69 @@ document.addEventListener('DOMContentLoaded', function() {
     function resetFiltersFunc() {
         searchName.value = '';
         filterLocation.value = '';
+        filterCompany.value = '';
+        filterKeyword.value = '';
+        minMatch.value = '';
+        minExperience.value = '';
         sortBy.value = 'match';
+        resultsPerPage.value = '200';
         
-        candidateRows.forEach(row => {
-            row.style.display = '';
-            tbody.appendChild(row);
-        });
+        filteredRows = [...candidateRows];
+        currentPage = 1;
+        activeFilters.style.display = 'none';
         
-        // Remove location highlighting
-        document.querySelectorAll('.location-cell').forEach(cell => {
-            const text = cell.textContent;
-            cell.innerHTML = text;
-        });
-        
-        resultCount.textContent = `Showing ${candidateRows.length} candidate${candidateRows.length !== 1 ? 's' : ''}`;
-        noResults.style.display = 'none';
+        displayPage();
     }
 
     // Event listeners
     applyFilters.addEventListener('click', applyFiltersFunc);
     resetFilters.addEventListener('click', resetFiltersFunc);
     
-    // Real-time search on Enter key
-    searchName.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') applyFiltersFunc();
-    });
+    prevPage.addEventListener('click', () => { currentPage--; displayPage(); });
+    nextPage.addEventListener('click', () => { currentPage++; displayPage(); });
+    prevPageBottom.addEventListener('click', () => { currentPage--; displayPage(); });
+    nextPageBottom.addEventListener('click', () => { currentPage++; displayPage(); });
     
-    filterLocation.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') applyFiltersFunc();
+    resultsPerPage.addEventListener('change', () => { currentPage = 1; displayPage(); });
+    
+    // Real-time search on Enter
+    [searchName, filterLocation, filterCompany, filterKeyword, minMatch, minExperience].forEach(input => {
+        input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') applyFiltersFunc();
+        });
     });
     
     sortBy.addEventListener('change', applyFiltersFunc);
+    
+    // Initial display
+    displayPage();
 });
 </script>
 
 <style>
+.table-responsive {
+    max-height: 800px;
+    overflow-y: auto;
+}
+
+thead.sticky-top {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
 #candidatesTable tbody tr {
     transition: all 0.3s ease;
 }
 
-.location-cell .badge {
+#candidatesTable tbody tr:hover {
+    background-color: #f8f9fa;
+    transform: scale(1.01);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.location-cell .badge,
+.company-cell .badge {
     font-size: 0.85rem;
     padding: 0.35em 0.65em;
 }
@@ -345,8 +568,27 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.card-body .form-control,
+.card-body .form-select {
+    border: 2px solid #fff;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.card-body .form-control:focus,
+.card-body .form-select:focus {
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.3);
+    border-color: #fff;
+}
+
+.progress {
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 </style>
 
