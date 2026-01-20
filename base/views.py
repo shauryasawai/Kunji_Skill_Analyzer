@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 # Constants
 ALLOWED_FILE_EXTENSIONS = ['.pdf', '.docx', '.doc', '.txt']
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
-MAX_SESSION_CANDIDATES = 100
+MAX_SESSION_CANDIDATES = 300
 
 # ============================================================
 # TOKEN TRACKING UTILITIES
