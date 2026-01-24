@@ -12,6 +12,6 @@ google-auth-oauthlib==1.2.3
 google-auth-httplib2==0.2.1
 
 dj-database-url==3.0.1
-psycopg[binary]==3.2.2
+psycopg[binary]
 python-dotenv==1.2.1
 fuzzywuzzy==0.18.0
