@@ -398,11 +398,6 @@ def match_candidates(request, jd_pk):
                     model=model,
                     cost=cost
                 )
-                
-                messages.info(
-                    request,
-                    f"AI Matching: {token_usage['total_tokens']} tokens used (${cost:.4f})"
-                )
         else:
             matched_candidates = result
         

@@ -1378,7 +1378,8 @@ def normalize_candidate_dataframe(df):
         'c_skills': 'skills',
         'c_qualifications': 'qualification',
         'c_designation': 'designation',
-        'c_cv_url': 'cv_link'
+        'c_cv_url': 'cv_link',
+        'c_company': 'current_company'
     }
     
     rename_dict = {old: new for old, new in column_mapping.items() if old in df.columns}

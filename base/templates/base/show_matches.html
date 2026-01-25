@@ -34,56 +34,40 @@
                         <h5 class="text-white mb-4">🔍 Advanced Search & Filters</h5>
                         
                         <div class="row g-3">
-                            <!-- Universal Search Bar -->
                             <div class="col-md-12">
-                                <label for="universalSearch" class="form-label text-white">
-                                </label>
                                 <div class="input-group input-group-lg">
                                     <span class="input-group-text bg-white">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
                                             <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
                                         </svg>
                                     </span>
-                                    <input type="text" 
-                                           class="form-control form-control-lg" 
-                                           id="universalSearch" 
-                                           placeholder="Type to search across all candidate information..."
-                                           autocomplete="off">
-                                    <button class="btn btn-light" type="button" id="clearSearch">
-                                        ✕ Clear
-                                    </button>
+                                    <input type="text" class="form-control form-control-lg" id="universalSearch" placeholder="Type to search across all candidate information..." autocomplete="off">
+                                    <button class="btn btn-light" type="button" id="clearSearch">✕ Clear</button>
                                 </div>
                                 <small class="text-white opacity-75 d-block mt-2">
-                                    💡 <strong>Examples:</strong> "Python", "Mumbai", "Senior Developer", "5 years", "MBA", "john@email.com", "+91"
+                                    💡 <strong>Examples:</strong> "Python", "Mumbai", "Senior Developer", "Google", "MBA", "john@email.com"
                                 </small>
                             </div>
                         </div>
                         
-                        <!-- Advanced Filters Toggle -->
                         <div class="mt-3">
                             <button class="btn btn-outline-light" type="button" data-bs-toggle="collapse" data-bs-target="#advancedFilters">
                                 ⚙️ Advanced Filters <span id="filterToggleIcon">▼</span>
                             </button>
                         </div>
                         
-                        <!-- Collapsible Advanced Filters -->
                         <div class="collapse mt-3" id="advancedFilters">
                             <div class="card bg-white bg-opacity-10 border-0">
                                 <div class="card-body">
                                     <div class="row g-3">
-                                        <!-- Minimum Match % -->
                                         <div class="col-md-4">
                                             <label for="minMatch" class="form-label text-white">📊 Min Match %</label>
                                             <input type="number" class="form-control" id="minMatch" placeholder="e.g., 70" min="0" max="100">
                                         </div>
-                                        
-                                        <!-- Experience Range -->
                                         <div class="col-md-4">
                                             <label for="minExperience" class="form-label text-white">⏱️ Min Experience (years)</label>
                                             <input type="number" class="form-control" id="minExperience" placeholder="e.g., 5" min="0">
                                         </div>
-                                        
-                                        <!-- Sort By -->
                                         <div class="col-md-4">
                                             <label for="sortBy" class="form-label text-white">⚡ Sort By</label>
                                             <select class="form-select" id="sortBy">
@@ -94,8 +78,6 @@
                                                 <option value="relevance">Search Relevance</option>
                                             </select>
                                         </div>
-                                        
-                                        <!-- Results per page -->
                                         <div class="col-md-4">
                                             <label for="resultsPerPage" class="form-label text-white">📄 Results Per Page</label>
                                             <select class="form-select" id="resultsPerPage">
@@ -112,12 +94,8 @@
                         
                         <div class="mt-4 d-flex justify-content-between align-items-center flex-wrap gap-3">
                             <div>
-                                <button class="btn btn-light btn-lg me-2" id="applyFilters">
-                                    🎯 Apply Filters
-                                </button>
-                                <button class="btn btn-outline-light btn-lg" id="resetFilters">
-                                    🔄 Reset All
-                                </button>
+                                <button class="btn btn-light btn-lg me-2" id="applyFilters">🎯 Apply Filters</button>
+                                <button class="btn btn-outline-light btn-lg" id="resetFilters">🔄 Reset All</button>
                             </div>
                             <div>
                                 <span class="badge bg-light text-dark fs-6 p-2" id="resultCount">
@@ -126,7 +104,6 @@
                             </div>
                         </div>
                         
-                        <!-- Active Search Display -->
                         <div id="activeSearch" class="mt-3" style="display: none;">
                             <div class="p-3" style="background: rgba(255,255,255,0.2); border-radius: 8px;">
                                 <strong class="text-white">🔍 Active Search:</strong>
@@ -191,6 +168,7 @@
                                 <th style="min-width: 100px;">Match %</th>
                                 <th style="min-width: 180px;">Name</th>
                                 <th style="min-width: 150px;">Designation</th>
+                                <th style="min-width: 150px;">Current Company</th>
                                 <th style="min-width: 120px;">Qualifications</th>
                                 <th style="min-width: 100px;">Experience</th>
                                 <th style="min-width: 150px;">Location</th>
@@ -206,6 +184,7 @@
                                 data-contact="{{ candidate.contact|lower }}"
                                 data-location="{{ candidate.location|lower }}"
                                 data-designation="{{ candidate.designation|default:''|lower }}"
+                                data-company="{{ candidate.current_company|default:''|lower }}"
                                 data-skills="{{ candidate.skills|default:''|lower }}"
                                 data-matched-skills="{% if candidate.matched_skills %}{% for skill in candidate.matched_skills %}{{ skill|lower }}{% if not forloop.last %} {% endif %}{% endfor %}{% endif %}"
                                 data-qualification="{{ candidate.qualification|default:''|lower }}"
@@ -219,11 +198,7 @@
                                             {% elif candidate.match_percentage >= 60 %}bg-info
                                             {% elif candidate.match_percentage >= 40 %}bg-warning
                                             {% else %}bg-secondary{% endif %}"
-                                            role="progressbar" 
-                                            style="width: {{ candidate.match_percentage }}%"
-                                            aria-valuenow="{{ candidate.match_percentage }}"
-                                            aria-valuemin="0"
-                                            aria-valuemax="100">
+                                            role="progressbar" style="width: {{ candidate.match_percentage }}%">
                                             <strong style="font-size: 11px;">{{ candidate.match_percentage }}%</strong>
                                         </div>
                                     </div>
@@ -238,14 +213,18 @@
                                     {% endif %}
                                 </td>
                                 <td class="searchable-field">{{ candidate.designation|default:"N/A" }}</td>
+                                <td class="searchable-field">
+                                    <span class="badge bg-info text-dark">
+                                        🏢 {{ candidate.current_company|default:"N/A" }}
+                                    </span>
+                                </td>
                                 <td class="searchable-field">{{ candidate.qualification|default:"N/A" }}</td>
                                 <td class="searchable-field">{{ candidate.experience|default:"N/A" }}</td>
                                 <td>
                                     <span class="searchable-field">{{ candidate.location|default:"N/A" }}</span>
                                 </td>
                                 <td>
-                                    <button class="btn btn-sm btn-outline-info view-skills-btn" 
-                                            type="button"
+                                    <button class="btn btn-sm btn-outline-info view-skills-btn" type="button"
                                             data-candidate-name="{{ candidate.name }}"
                                             data-matched-count="{{ candidate.matched_skills_count }}"
                                             data-matched-skills="{% if candidate.matched_skills %}{% for skill in candidate.matched_skills %}{{ skill }}{% if not forloop.last %}|||{% endif %}{% endfor %}{% endif %}"
@@ -270,8 +249,12 @@
                     </table>
                 </div>
 
-                <!-- Pagination Controls Bottom -->
                 <div class="d-flex justify-content-between align-items-center mt-3">
+                    <div>
+                        <button class="btn btn-outline-primary" id="prevPageBottom" disabled>← Previous</button>
+                        <span class="mx-3 fw-bold" id="pageInfoBottom">Page 1</span>
+                        <button class="btn btn-outline-primary" id="nextPageBottom">Next →</button>
+                    </div>
                     <div class="text-muted">
                         <span id="pageRangeBottom"></span>
                     </div>
@@ -297,19 +280,16 @@
     </div>
 </div>
 
-<!-- Single Skills Modal for all candidates -->
-<div class="modal fade" id="skillsModal" tabindex="-1" aria-labelledby="skillsModalLabel" aria-hidden="true">
+<div class="modal fade" id="skillsModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="skillsModalLabel">Skills - <span id="modalCandidateName"></span></h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <h5 class="modal-title">Skills - <span id="modalCandidateName"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <h6>✅ Matched Skills (<span id="modalMatchedCount"></span>):</h6>
-                <div class="mb-3" id="modalMatchedSkills">
-                    <!-- Matched skills will be inserted here -->
-                </div>
+                <div class="mb-3" id="modalMatchedSkills"></div>
                 <hr>
                 <h6>📋 All Candidate Skills:</h6>
                 <p id="modalAllSkills"></p>
@@ -320,7 +300,6 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Filter inputs
     const universalSearch = document.getElementById('universalSearch');
     const clearSearch = document.getElementById('clearSearch');
     const minMatch = document.getElementById('minMatch');
@@ -329,20 +308,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const resultsPerPage = document.getElementById('resultsPerPage');
     const applyFilters = document.getElementById('applyFilters');
     const resetFilters = document.getElementById('resetFilters');
-    
-    // Display elements
     const resultCount = document.getElementById('resultCount');
     const noResults = document.getElementById('noResults');
     const activeSearch = document.getElementById('activeSearch');
     const searchBadges = document.getElementById('searchBadges');
-    
-    // Stats elements
     const avgMatch = document.getElementById('avgMatch');
     const topMatch = document.getElementById('topMatch');
     const uniqueLocations = document.getElementById('uniqueLocations');
     const avgExp = document.getElementById('avgExp');
-    
-    // Pagination elements
     const prevPage = document.getElementById('prevPage');
     const nextPage = document.getElementById('nextPage');
     const pageInfo = document.getElementById('pageInfo');
@@ -351,8 +324,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const nextPageBottom = document.getElementById('nextPageBottom');
     const pageInfoBottom = document.getElementById('pageInfoBottom');
     const pageRangeBottom = document.getElementById('pageRangeBottom');
-    
-    // Data
     const candidateRows = Array.from(document.querySelectorAll('.candidate-row'));
     const tbody = document.querySelector('#candidatesTable tbody');
     
@@ -360,7 +331,6 @@ document.addEventListener('DOMContentLoaded', function() {
     let filteredRows = [...candidateRows];
     let searchRelevanceScores = new Map();
 
-    // Calculate search relevance score
     function calculateRelevance(row, searchTerms) {
         let score = 0;
         const fields = {
@@ -368,6 +338,7 @@ document.addEventListener('DOMContentLoaded', function() {
             email: { weight: 3, value: row.getAttribute('data-email') },
             contact: { weight: 3, value: row.getAttribute('data-contact') },
             designation: { weight: 4, value: row.getAttribute('data-designation') },
+            company: { weight: 4, value: row.getAttribute('data-company') },
             skills: { weight: 5, value: row.getAttribute('data-skills') },
             matched_skills: { weight: 6, value: row.getAttribute('data-matched-skills') },
             location: { weight: 3, value: row.getAttribute('data-location') },
@@ -378,95 +349,58 @@ document.addEventListener('DOMContentLoaded', function() {
             Object.entries(fields).forEach(([field, data]) => {
                 const value = data.value || '';
                 if (value.includes(term)) {
-                    // Exact match gets more points
-                    if (value === term) {
-                        score += data.weight * 3;
-                    }
-                    // Match at start gets bonus
-                    else if (value.startsWith(term)) {
-                        score += data.weight * 2;
-                    }
-                    // Regular match
-                    else {
-                        score += data.weight;
-                    }
+                    if (value === term) score += data.weight * 3;
+                    else if (value.startsWith(term)) score += data.weight * 2;
+                    else score += data.weight;
                     
-                    // Word boundary match gets bonus
                     const regex = new RegExp(`\\b${term}\\b`, 'i');
-                    if (regex.test(value)) {
-                        score += data.weight * 0.5;
-                    }
+                    if (regex.test(value)) score += data.weight * 0.5;
                 }
             });
         });
-
         return score;
     }
 
-    // Universal search function
     function universalSearchFilter(row, query) {
         if (!query) return true;
-        
-        // Split query into terms for multi-word search
         const searchTerms = query.toLowerCase().trim().split(/\s+/);
-        
-        // Get all searchable data from the row including both all skills and matched skills
         const searchableData = [
-            row.getAttribute('data-name'),
-            row.getAttribute('data-email'),
-            row.getAttribute('data-contact'),
-            row.getAttribute('data-location'),
-            row.getAttribute('data-designation'),
-            row.getAttribute('data-skills'),
-            row.getAttribute('data-matched-skills'),
-            row.getAttribute('data-qualification'),
-            row.getAttribute('data-linkedin'),
+            row.getAttribute('data-name'), row.getAttribute('data-email'),
+            row.getAttribute('data-contact'), row.getAttribute('data-location'),
+            row.getAttribute('data-designation'), row.getAttribute('data-company'),
+            row.getAttribute('data-skills'), row.getAttribute('data-matched-skills'),
+            row.getAttribute('data-qualification'), row.getAttribute('data-linkedin'),
             row.getAttribute('data-experience')
         ].join(' ').toLowerCase();
 
-        // Check if ALL search terms are found (AND logic)
         const allTermsMatch = searchTerms.every(term => searchableData.includes(term));
-        
-        if (allTermsMatch) {
-            // Calculate relevance score for sorting
-            const relevance = calculateRelevance(row, searchTerms);
-            searchRelevanceScores.set(row, relevance);
-        }
-        
+        if (allTermsMatch) searchRelevanceScores.set(row, calculateRelevance(row, searchTerms));
         return allTermsMatch;
     }
 
-    // Highlight matching text in cells
     function highlightMatches(searchQuery) {
         if (!searchQuery) {
-            // Remove all highlights
             document.querySelectorAll('.searchable-field').forEach(cell => {
                 cell.innerHTML = cell.textContent;
             });
             return;
         }
-
         const searchTerms = searchQuery.toLowerCase().trim().split(/\s+/);
-        
         document.querySelectorAll('.searchable-field').forEach(cell => {
             let html = cell.textContent;
-            
             searchTerms.forEach(term => {
-                if (term.length < 2) return; // Skip very short terms
-                
-                const regex = new RegExp(`(${term})`, 'gi');
-                html = html.replace(regex, '<mark class="bg-warning">$1</mark>');
+                if (term.length >= 2) {
+                    const regex = new RegExp(`(${term})`, 'gi');
+                    html = html.replace(regex, '<mark class="bg-warning">$1</mark>');
+                }
             });
-            
             cell.innerHTML = html;
         });
     }
 
-    // Update active search display
     function updateActiveSearch() {
         const searchQuery = universalSearch.value.trim();
         const filters = [];
-        
         if (searchQuery) filters.push(`Search: "${searchQuery}"`);
         if (minMatch.value.trim()) filters.push(`Min Match: ${minMatch.value}%`);
         if (minExperience.value.trim()) filters.push(`Min Exp: ${minExperience.value} years`);
@@ -481,37 +415,23 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Calculate and update stats
     function updateStats() {
         if (filteredRows.length === 0) {
-            avgMatch.textContent = '-';
-            topMatch.textContent = '-';
-            uniqueLocations.textContent = '-';
-            avgExp.textContent = '-';
+            avgMatch.textContent = topMatch.textContent = uniqueLocations.textContent = avgExp.textContent = '-';
             return;
         }
 
-        // Average match percentage
         const matches = filteredRows.map(row => parseFloat(row.getAttribute('data-match')));
         const avg = (matches.reduce((a, b) => a + b, 0) / matches.length).toFixed(1);
         avgMatch.textContent = avg + '%';
+        topMatch.textContent = Math.max(...matches) + '%';
 
-        // Top match
-        const top = Math.max(...matches);
-        topMatch.textContent = top + '%';
-
-        // Unique locations
         const locations = new Set(filteredRows.map(row => 
             row.getAttribute('data-location')
         ).filter(loc => loc && loc !== 'n/a'));
         uniqueLocations.textContent = locations.size;
 
-        // Average experience
-        const experiences = filteredRows.map(row => {
-            const exp = row.getAttribute('data-experience');
-            return parseFloat(exp) || 0;
-        }).filter(exp => exp > 0);
-        
+        const experiences = filteredRows.map(row => parseFloat(row.getAttribute('data-experience')) || 0).filter(exp => exp > 0);
         if (experiences.length > 0) {
             const avgExpVal = (experiences.reduce((a, b) => a + b, 0) / experiences.length).toFixed(1);
             avgExp.textContent = avgExpVal + ' yrs';
@@ -526,47 +446,31 @@ document.addEventListener('DOMContentLoaded', function() {
         const minExpValue = parseFloat(minExperience.value) || 0;
         const sortValue = sortBy.value;
         
-        // Reset relevance scores
         searchRelevanceScores.clear();
-        
-        // Filter rows
         filteredRows = candidateRows.filter(row => {
             const matchPerc = parseFloat(row.getAttribute('data-match'));
             const experience = parseFloat(row.getAttribute('data-experience')) || 0;
-            
-            const searchMatch = universalSearchFilter(row, searchQuery);
-            const matchFilter = matchPerc >= minMatchValue;
-            const expFilter = experience >= minExpValue;
-            
-            return searchMatch && matchFilter && expFilter;
+            return universalSearchFilter(row, searchQuery) && matchPerc >= minMatchValue && experience >= minExpValue;
         });
 
-        // Sort the filtered rows
         filteredRows.sort((a, b) => {
-            if (sortValue === 'match') {
-                return parseFloat(b.getAttribute('data-match')) - parseFloat(a.getAttribute('data-match'));
-            } else if (sortValue === 'matchLow') {
-                return parseFloat(a.getAttribute('data-match')) - parseFloat(b.getAttribute('data-match'));
-            } else if (sortValue === 'name') {
-                return a.getAttribute('data-name').localeCompare(b.getAttribute('data-name'));
-            } else if (sortValue === 'experience') {
+            if (sortValue === 'match') return parseFloat(b.getAttribute('data-match')) - parseFloat(a.getAttribute('data-match'));
+            if (sortValue === 'matchLow') return parseFloat(a.getAttribute('data-match')) - parseFloat(b.getAttribute('data-match'));
+            if (sortValue === 'name') return a.getAttribute('data-name').localeCompare(b.getAttribute('data-name'));
+            if (sortValue === 'experience') {
                 const expA = parseFloat(a.getAttribute('data-experience')) || 0;
                 const expB = parseFloat(b.getAttribute('data-experience')) || 0;
                 return expB - expA;
-            } else if (sortValue === 'relevance' && searchQuery) {
-                const scoreA = searchRelevanceScores.get(a) || 0;
-                const scoreB = searchRelevanceScores.get(b) || 0;
-                return scoreB - scoreA;
+            }
+            if (sortValue === 'relevance' && searchQuery) {
+                return (searchRelevanceScores.get(b) || 0) - (searchRelevanceScores.get(a) || 0);
             }
             return 0;
         });
 
-        // Update displays
         updateActiveSearch();
         highlightMatches(searchQuery);
         updateStats();
-        
-        // Reset to page 1 and ensure 50 results per page
         currentPage = 1;
         resultsPerPage.value = '50';
         displayPage();
@@ -575,182 +479,93 @@ document.addEventListener('DOMContentLoaded', function() {
     function displayPage() {
         const perPage = resultsPerPage.value === 'all' ? filteredRows.length : parseInt(resultsPerPage.value);
         const totalPages = perPage > 0 ? Math.ceil(filteredRows.length / perPage) : 1;
-        
-        // Ensure currentPage is within valid range
-        if (currentPage > totalPages && totalPages > 0) {
-            currentPage = totalPages;
-        }
-        if (currentPage < 1) {
-            currentPage = 1;
-        }
+        if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
         
         const start = (currentPage - 1) * perPage;
         const end = resultsPerPage.value === 'all' ? filteredRows.length : Math.min(start + perPage, filteredRows.length);
         
-        // Clear tbody first
-        while (tbody.firstChild) {
-            tbody.removeChild(tbody.firstChild);
-        }
+        while (tbody.firstChild) tbody.removeChild(tbody.firstChild);
         
-        // Show current page rows
-        const pageRows = filteredRows.slice(start, end);
-        pageRows.forEach(row => {
-            const clonedRow = row.cloneNode(true);
-            tbody.appendChild(clonedRow);
+        filteredRows.slice(start, end).forEach(row => {
+            tbody.appendChild(row.cloneNode(true));
         });
 
-        // Update pagination controls
-        const pageText = resultsPerPage.value === 'all' 
-            ? `All Results (${filteredRows.length})` 
-            : totalPages > 0 ? `Page ${currentPage} of ${totalPages}` : 'Page 1 of 1';
-        const rangeText = filteredRows.length > 0 
-            ? `Showing ${start + 1}-${end} of ${filteredRows.length}`
-            : 'No results';
+        const pageText = resultsPerPage.value === 'all' ? `All Results (${filteredRows.length})` : 
+            totalPages > 0 ? `Page ${currentPage} of ${totalPages}` : 'Page 1 of 1';
+        const rangeText = filteredRows.length > 0 ? `Showing ${start + 1}-${end} of ${filteredRows.length}` : 'No results';
         
-        pageInfo.textContent = pageText;
-        pageInfoBottom.textContent = pageText;
-        pageRange.textContent = rangeText;
-        pageRangeBottom.textContent = rangeText;
+        pageInfo.textContent = pageInfoBottom.textContent = pageText;
+        pageRange.textContent = pageRangeBottom.textContent = rangeText;
         
         const isShowingAll = resultsPerPage.value === 'all';
-        const isFirstPage = currentPage === 1;
-        const isLastPage = currentPage >= totalPages;
+        const disabled = isShowingAll || filteredRows.length === 0;
+        prevPage.disabled = prevPageBottom.disabled = disabled || currentPage === 1;
+        nextPage.disabled = nextPageBottom.disabled = disabled || currentPage >= totalPages;
         
-        prevPage.disabled = isShowingAll || isFirstPage || filteredRows.length === 0;
-        nextPage.disabled = isShowingAll || isLastPage || filteredRows.length === 0;
-        prevPageBottom.disabled = prevPage.disabled;
-        nextPageBottom.disabled = nextPage.disabled;
-        
-        // Update result count
         resultCount.textContent = `Showing ${filteredRows.length} candidate${filteredRows.length !== 1 ? 's' : ''}`;
-        
-        // Show/hide no results message
         noResults.style.display = filteredRows.length === 0 ? 'block' : 'none';
-        
-        console.log(`Displaying page ${currentPage} of ${totalPages}, showing ${pageRows.length} rows (${start + 1} to ${end} of ${filteredRows.length} total)`);
     }
 
     function resetFiltersFunc() {
-        universalSearch.value = '';
-        minMatch.value = '';
-        minExperience.value = '';
+        universalSearch.value = minMatch.value = minExperience.value = '';
         sortBy.value = 'match';
         resultsPerPage.value = '50';
-        
         filteredRows = [...candidateRows];
         searchRelevanceScores.clear();
         currentPage = 1;
         activeSearch.style.display = 'none';
-        
         highlightMatches('');
         updateStats();
         displayPage();
     }
 
-    // Event listeners
     applyFilters.addEventListener('click', applyFiltersFunc);
     resetFilters.addEventListener('click', resetFiltersFunc);
-    clearSearch.addEventListener('click', () => {
-        universalSearch.value = '';
-        applyFiltersFunc();
-    });
+    clearSearch.addEventListener('click', () => { universalSearch.value = ''; applyFiltersFunc(); });
     
-    prevPage.addEventListener('click', () => { 
-        if (currentPage > 1) {
-            currentPage--; 
-            displayPage();
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-    });
-    
+    prevPage.addEventListener('click', () => { if (currentPage > 1) { currentPage--; displayPage(); window.scrollTo({ top: 0, behavior: 'smooth' }); }});
     nextPage.addEventListener('click', () => { 
         const perPage = resultsPerPage.value === 'all' ? filteredRows.length : parseInt(resultsPerPage.value);
         const totalPages = Math.ceil(filteredRows.length / perPage);
-        if (currentPage < totalPages) {
-            currentPage++; 
-            displayPage();
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
+        if (currentPage < totalPages) { currentPage++; displayPage(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
     });
-    
-    prevPageBottom.addEventListener('click', () => { 
-        if (currentPage > 1) {
-            currentPage--; 
-            displayPage();
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-    });
-    
+    prevPageBottom.addEventListener('click', () => { if (currentPage > 1) { currentPage--; displayPage(); window.scrollTo({ top: 0, behavior: 'smooth' }); }});
     nextPageBottom.addEventListener('click', () => { 
         const perPage = resultsPerPage.value === 'all' ? filteredRows.length : parseInt(resultsPerPage.value);
         const totalPages = Math.ceil(filteredRows.length / perPage);
-        if (currentPage < totalPages) {
-            currentPage++; 
-            displayPage();
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
+        if (currentPage < totalPages) { currentPage++; displayPage(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
     });
     
-    resultsPerPage.addEventListener('change', () => { 
-        currentPage = 1; 
-        displayPage(); 
-    });
+    resultsPerPage.addEventListener('change', () => { currentPage = 1; displayPage(); });
     
-    // Real-time search on Enter or after typing
     let searchTimeout;
     universalSearch.addEventListener('input', () => {
         clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(() => {
-            applyFiltersFunc();
-        }, 500); // Debounce for 500ms
+        searchTimeout = setTimeout(applyFiltersFunc, 500);
     });
-    
     universalSearch.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            clearTimeout(searchTimeout);
-            applyFiltersFunc();
-        }
+        if (e.key === 'Enter') { clearTimeout(searchTimeout); applyFiltersFunc(); }
     });
     
     [minMatch, minExperience].forEach(input => {
-        input.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') applyFiltersFunc();
-        });
+        input.addEventListener('keypress', (e) => { if (e.key === 'Enter') applyFiltersFunc(); });
     });
-    
     sortBy.addEventListener('change', applyFiltersFunc);
     
-    // Advanced filters toggle icon
     const advancedFilters = document.getElementById('advancedFilters');
     const filterToggleIcon = document.getElementById('filterToggleIcon');
+    advancedFilters.addEventListener('show.bs.collapse', () => filterToggleIcon.textContent = '▲');
+    advancedFilters.addEventListener('hide.bs.collapse', () => filterToggleIcon.textContent = '▼');
     
-    advancedFilters.addEventListener('show.bs.collapse', () => {
-        filterToggleIcon.textContent = '▲';
-    });
-    
-    advancedFilters.addEventListener('hide.bs.collapse', () => {
-        filterToggleIcon.textContent = '▼';
-    });
-    
-    // Handle skills modal
     const skillsModal = new bootstrap.Modal(document.getElementById('skillsModal'));
-    const modalCandidateName = document.getElementById('modalCandidateName');
-    const modalMatchedCount = document.getElementById('modalMatchedCount');
-    const modalMatchedSkills = document.getElementById('modalMatchedSkills');
-    const modalAllSkills = document.getElementById('modalAllSkills');
-    
     document.addEventListener('click', function(e) {
         if (e.target && e.target.classList.contains('view-skills-btn')) {
-            const candidateName = e.target.getAttribute('data-candidate-name');
-            const matchedCount = e.target.getAttribute('data-matched-count');
+            document.getElementById('modalCandidateName').textContent = e.target.getAttribute('data-candidate-name');
+            document.getElementById('modalMatchedCount').textContent = e.target.getAttribute('data-matched-count');
+            
             const matchedSkillsStr = e.target.getAttribute('data-matched-skills');
-            const allSkills = e.target.getAttribute('data-all-skills');
-            
-            // Update modal content
-            modalCandidateName.textContent = candidateName;
-            modalMatchedCount.textContent = matchedCount;
-            
-            // Parse and display matched skills
+            const modalMatchedSkills = document.getElementById('modalMatchedSkills');
             if (matchedSkillsStr && matchedSkillsStr.trim() !== '') {
                 const matchedSkillsArray = matchedSkillsStr.split('|||');
                 modalMatchedSkills.innerHTML = matchedSkillsArray
@@ -760,15 +575,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 modalMatchedSkills.innerHTML = '<p class="text-muted">No matched skills</p>';
             }
             
-            // Display all skills
-            modalAllSkills.textContent = allSkills;
-            
-            // Show modal
+            document.getElementById('modalAllSkills').textContent = e.target.getAttribute('data-all-skills');
             skillsModal.show();
         }
     });
     
-    // Initial display
     updateStats();
     displayPage();
 });
@@ -804,9 +615,8 @@ mark.bg-warning {
 }
 
 @keyframes highlightPulse {
-    0% { background-color: #fff3cd; }
+    0%, 100% { background-color: #fff3cd; }
     50% { background-color: #ffd700; }
-    100% { background-color: #fff3cd; }
 }
 
 #noResults {
@@ -883,7 +693,6 @@ mark.bg-warning {
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-/* Smooth transitions for table rows */
 .candidate-row {
     opacity: 1;
     transition: opacity 0.3s ease, transform 0.3s ease;
@@ -894,7 +703,6 @@ mark.bg-warning {
     transform: scale(0.95);
 }
 
-/* Loading state for search */
 #universalSearch.searching {
     background-image: linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.1), transparent);
     background-size: 200% 100%;
@@ -906,7 +714,6 @@ mark.bg-warning {
     100% { background-position: 200% 0; }
 }
 
-/* Responsive adjustments */
 @media (max-width: 768px) {
     .d-flex.flex-wrap {
         flex-direction: column;
@@ -921,7 +728,6 @@ mark.bg-warning {
     }
 }
 
-/* Enhanced button styles */
 .btn-lg {
     padding: 0.75rem 1.5rem;
     font-weight: 600;
@@ -940,12 +746,10 @@ mark.bg-warning {
     color: #fff;
 }
 
-/* Advanced filters card */
 #advancedFilters .card {
     backdrop-filter: blur(10px);
 }
 
-/* Pagination buttons */
 .btn-outline-primary {
     transition: all 0.3s ease;
 }
@@ -958,6 +762,11 @@ mark.bg-warning {
 .btn-outline-primary:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+}
+
+.badge.bg-info {
+    font-size: 0.85rem;
+    padding: 0.4rem 0.6rem;
 }
 </style>
 
