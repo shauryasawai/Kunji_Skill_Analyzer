@@ -11,7 +11,7 @@ from .forms import JDUploadForm, CandidateMatchForm
 from .models import JobDescription
 from .utils import (cleanup_old_matched_files, extract_text_from_file, extract_skills_from_jd, save_jd_to_excel, 
                     generate_linkedin_search_strings, match_candidates_with_jd,
-                    export_matched_candidates, fetch_candidates_from_api,fetch_candidates_from_api_initial)
+                    export_matched_candidates, fetch_candidates_from_api, fetch_candidates_from_api_initial)
 from datetime import datetime
 from django.conf import settings
 from django.utils import timezone
@@ -314,7 +314,7 @@ def results(request, pk):
             linkedin_searches = {}
             logger.error(f"Failed to parse LinkedIn search strings for JD {pk}")
     
-    api_available = hasattr(settings, 'CANDIDATES_API_URL') and settings.CANDIDATES_API_URL
+    api_available = hasattr(settings, 'CANDIDATES_API_BASE_URL') and settings.CANDIDATES_API_BASE_URL
     
     total_candidates = 0
     if api_available:
@@ -370,9 +370,46 @@ def match_candidates(request, jd_pk):
     try:
         logger.info(f"Matching candidates for JD {jd_pk} with {len(required_skills)} skills, min_match={min_match}%")
         
+        # ============================================================
+        # MODIFIED: Extract experience requirement from JD
+        # ============================================================
+        required_experience = None
+        if hasattr(jd, 'required_experience_years') and jd.required_experience_years:
+            # If it's stored as JSON string, parse it
+            if isinstance(jd.required_experience_years, str):
+                try:
+                    exp_data = json.loads(jd.required_experience_years)
+                    required_experience = exp_data.get('min', exp_data.get('max'))
+                except:
+                    # Try to extract numeric value
+                    from .utils import parse_experience_years
+                    required_experience = parse_experience_years(jd.required_experience_years)
+            elif isinstance(jd.required_experience_years, dict):
+                required_experience = jd.required_experience_years.get('min')
+            elif isinstance(jd.required_experience_years, (int, float)):
+                required_experience = int(jd.required_experience_years)
+        
+        # ============================================================
+        # Get top skills for API filtering (prioritize important skills)
+        # ============================================================
+        priority_skills = jd.get_linkedin_skills_list() if hasattr(jd, 'get_linkedin_skills_list') else required_skills[:10]
+        
+        # Use priority skills if available, otherwise use top required skills
+        api_filter_skills = priority_skills if priority_skills else required_skills[:10]
+        
+        logger.info(f"API Filters - Skills: {api_filter_skills[:5]}..., Experience: {required_experience}")
+        
+        # ============================================================
+        # MODIFIED: Pass skills and experience to matching function
+        # This will fetch filtered candidates from API
+        # ============================================================
         result = match_candidates_with_jd(
             required_skills=required_skills,
-            min_match_percentage=min_match
+            min_match_percentage=min_match,
+            jd_role_title=jd.title,
+            required_experience=required_experience,
+            api_filter_skills=api_filter_skills,  # NEW: Pass skills for API filtering
+            max_candidates_from_api=500  # NEW: Limit to 500 candidates
         )
         
         # Check if result includes token usage (if matching uses OpenAI)
@@ -397,6 +434,15 @@ def match_candidates(request, jd_pk):
                     total_tokens=token_usage['total_tokens'],
                     model=model,
                     cost=cost
+                )
+            
+            # Show API filtering stats if available
+            if 'api_stats' in result:
+                api_stats = result['api_stats']
+                messages.info(
+                    request, 
+                    f"Fetched {api_stats.get('total_fetched', 0)} candidates from API "
+                    f"(filtered by {len(api_filter_skills)} skills and experience: {required_experience or 'any'})"
                 )
         else:
             matched_candidates = result
@@ -439,9 +485,10 @@ def match_candidates(request, jd_pk):
         request.session['jd_id'] = jd.pk
         request.session['match_settings'] = {
             'min_match_percentage': min_match,
-            'total_skills': len(required_skills)
+            'total_skills': len(required_skills),
+            'api_filter_skills': api_filter_skills,
+            'required_experience': required_experience
         }
-        # FIX: Add sheet_name to session (it's set by export_matched_candidates but let's be explicit)
         request.session['sheet_name'] = 'Matched Candidates'
         
         logger.info(f"Found {len(matched_candidates)} matches for JD {jd_pk}")
@@ -471,7 +518,6 @@ def show_matches(request, jd_pk):
         return redirect('results', pk=jd_pk)
     
     matched_candidates = request.session.get('matched_candidates', [])
-    # FIX: Add this line to get excel file info from session
     output_file = request.session.get('excel_filename', '')
     sheet_name = request.session.get('sheet_name', 'Matched Candidates')
     
@@ -488,7 +534,6 @@ def show_matches(request, jd_pk):
     context = {
         'jd': jd,
         'matched_candidates': matched_candidates,
-        # FIX: Add these two lines
         'output_file': output_file,
         'sheet_name': sheet_name,
         'total_matches': total_matches,
@@ -555,7 +600,13 @@ def download_matched_file(request, jd_pk):
 def test_api_connection(request):
     """Test API connection and display candidate count"""
     try:
-        df = fetch_candidates_from_api()
+        # Test with some sample skills
+        df = fetch_candidates_from_api(
+            skills=['python', 'javascript'],
+            experience=2,
+            page=1,
+            limit=10
+        )
         
         if df.empty:
             messages.warning(request, "API connection successful but no candidates found.")

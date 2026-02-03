@@ -24,7 +24,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-lo7z9zeeo!i*@48g3h-2qff1=o)!x$6c^w3twsh-=yi)g!7av!'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = ['*']
 CSRF_TRUSTED_ORIGINS = [
@@ -221,7 +221,8 @@ import os
 load_dotenv()
 CANDIDATES_API_URL = os.getenv("CANDIDATES_API_URL", "")
 CANDIDATES_API_URL_INIT = os.getenv("CANDIDATES_API_URL_INIT", "")
-
+CANDIDATES_API_BASE_URL = os.getenv('CANDIDATES_API_BASE_URL')
+CANDIDATES_API_TOKEN = os.getenv('CANDIDATES_API_TOKEN')
 # # Logging Configuration
 # LOGGING = {
 #     'version': 1,
