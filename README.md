@@ -234,7 +234,7 @@ Time: ~4 seconds | API Calls: 200 | Cost: 10x lower
 ## 🛠️ Technology Stack
 
 ### Backend
-- **Language**: Python 3.9+ / Node.js 16+
+- **Language**: Python 3.9+
 - **AI/ML**: TensorFlow, scikit-learn, Hugging Face Transformers
 - **NLP**: spaCy, NLTK, custom semantic models
 - **Database**: PostgreSQL with vector extensions
@@ -325,7 +325,7 @@ Built with dedication during a year-long remote internship journey. Special than
 
 ## 📧 Contact & Support
 
-- **Project Maintainer**: Shaurya
+- **Project Maintainer**: Shauryaman Sawai
 - **Email**: sawaisushil@gmail.com
 - **Documentation**: [docs.kunjisearch.com](https://docs.kunjisearch.com)
 - **Issues**: [GitHub Issues](https://github.com/your-org/kunji-search/issues)
