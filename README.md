@@ -142,7 +142,7 @@ A two-pronged intelligent search system that transforms how organizations discov
 
 ```
 Username: shaurya
-Password: sawai
+Password: sawai123..
 ```
 
 ### Installation
