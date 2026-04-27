@@ -423,3 +423,12 @@ class TokenUsageLog(models.Model):
     
     class Meta:
         ordering = ['-created_at']
+        
+
+class AuditLog(models.Model):
+    action = models.CharField(max_length=255)
+    user = models.CharField(max_length=255, null=True, blank=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.action

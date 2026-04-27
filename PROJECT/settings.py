@@ -53,6 +53,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'base.middleware.SecurityHeadersMiddleware',
 ]
 
 ROOT_URLCONF = 'PROJECT.urls'
@@ -78,23 +79,23 @@ WSGI_APPLICATION = 'PROJECT.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.sqlite3',
-#         'NAME': BASE_DIR / 'db.sqlite3',
-#     }
-# }
-
-import dj_database_url
-import os
-from dotenv import load_dotenv
-load_dotenv()
-
-DATABASE_URL = os.getenv("DATABASE_URL")
-
 DATABASES = {
-    'default': dj_database_url.parse(DATABASE_URL, conn_max_age=600, ssl_require=False)
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+    }
 }
+
+# import dj_database_url
+# import os
+# from dotenv import load_dotenv
+# load_dotenv()
+
+# DATABASE_URL = os.getenv("DATABASE_URL")
+
+# DATABASES = {
+#     'default': dj_database_url.parse(DATABASE_URL, conn_max_age=600, ssl_require=False)
+# }
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators

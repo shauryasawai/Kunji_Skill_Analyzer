@@ -3,211 +3,323 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - JD Analyzer</title>
+
+    <!-- ✅ FIX 1: Clear, specific title — not generic "Sign in" -->
+    <title>Sign In — Kunji Skill Analyzer Pro</title>
+
+    <!-- ✅ FIX 2: Meta tags that identify the site clearly to Google -->
+    <meta name="description" content="Sign in to Kunji Skill Analyzer Pro — an AI-powered job description and skill analysis platform.">
+    <meta name="author" content="Kunji Skill Analyzer Pro">
+    <meta name="robots" content="noindex, nofollow">
+
+    <!-- ✅ FIX 3: No external scripts/fonts from unknown CDNs -->
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        /* ── Reset ── */
+        *, *::before, *::after {
+            margin: 0; padding: 0; box-sizing: border-box;
         }
-        
+
+        /* ── Root tokens — clearly custom brand, NOT mimicking Google/MS ── */
+        :root {
+            --brand:       #1a56db;
+            --brand-dark:  #1340a8;
+            --brand-light: #e8f0fe;
+            --surface:     #ffffff;
+            --bg:          #f0f4ff;
+            --border:      #d1daf5;
+            --text:        #1a1f36;
+            --muted:       #6b7693;
+            --error-bg:    #fff0f0;
+            --error:       #c0392b;
+            --success-bg:  #f0fff4;
+            --success:     #1a7f3c;
+            --radius:      10px;
+            --shadow:      0 4px 24px rgba(26, 86, 219, 0.10);
+        }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Georgia', 'Times New Roman', serif;
+            background: var(--bg);
             min-height: 100vh;
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 20px;
+            padding: 24px;
         }
-        
-        .login-container {
-            background: white;
-            padding: 40px;
-            border-radius: 10px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
-            width: 100%;
-            max-width: 400px;
-        }
-        
-        .login-header {
+
+        /* ── Site identity bar at top — clearly identifies this as YOUR site ── */
+        .site-identity {
             text-align: center;
-            margin-bottom: 30px;
+            margin-bottom: 24px;
         }
-        
-        .login-header h1 {
-            color: #333;
-            font-size: 28px;
-            margin-bottom: 10px;
-        }
-        
-        .login-header p {
-            color: #666;
-            font-size: 14px;
-        }
-        
-        .form-group {
-            margin-bottom: 20px;
-        }
-        
-        .form-group label {
-            display: block;
+
+        .site-identity .logo-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: var(--brand);
+            color: #fff;
+            padding: 8px 20px;
+            border-radius: 100px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
             margin-bottom: 8px;
-            color: #333;
-            font-weight: 500;
-            font-size: 14px;
         }
-        
-        .form-group input {
+
+        .site-identity .logo-badge svg {
+            width: 16px; height: 16px; fill: #fff;
+        }
+
+        .site-identity p {
+            font-size: 13px;
+            color: var(--muted);
+            letter-spacing: 0.3px;
+        }
+
+        /* ── Card ── */
+        .login-card {
+            background: var(--surface);
             width: 100%;
-            padding: 12px 15px;
-            border: 2px solid #e1e8ed;
-            border-radius: 5px;
+            max-width: 420px;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            padding: 40px 36px 32px;
+        }
+
+        .card-title {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 4px;
+            font-family: 'Georgia', serif;
+        }
+
+        .card-subtitle {
             font-size: 14px;
-            transition: border-color 0.3s;
+            color: var(--muted);
+            margin-bottom: 28px;
+            font-family: -apple-system, sans-serif;
         }
-        
-        .form-group input:focus {
-            outline: none;
-            border-color: #667eea;
+
+        /* ── Messages ── */
+        .alert {
+            padding: 11px 14px;
+            border-radius: 6px;
+            font-size: 13.5px;
+            margin-bottom: 18px;
+            font-family: -apple-system, sans-serif;
+            border-left: 3px solid transparent;
         }
-        
-        .error-message {
-            background: #fee;
-            color: #c33;
-            padding: 12px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            font-size: 14px;
+        .alert-error   { background: var(--error-bg);   color: var(--error);   border-color: var(--error); }
+        .alert-success { background: var(--success-bg); color: var(--success); border-color: var(--success); }
+
+        /* ── Form ── */
+        .form-group {
+            margin-bottom: 18px;
         }
-        
-        .success-message {
-            background: #efe;
-            color: #3c3;
-            padding: 12px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            font-size: 14px;
-        }
-        
-        .btn-login {
-            width: 100%;
-            padding: 12px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 5px;
-            font-size: 16px;
+
+        label {
+            display: block;
+            font-size: 13px;
             font-weight: 600;
-            cursor: pointer;
-            transition: transform 0.2s;
+            color: var(--text);
+            margin-bottom: 6px;
+            font-family: -apple-system, sans-serif;
         }
-        
-        .btn-login:hover {
-            transform: translateY(-2px);
-        }
-        
-        .btn-login:active {
-            transform: translateY(0);
-        }
-        
-        .login-footer {
-            text-align: center;
-            margin-top: 20px;
-            padding-top: 20px;
-            border-top: 1px solid #e1e8ed;
-        }
-        
-        .login-footer a {
-            color: #667eea;
-            text-decoration: none;
+
+        input[type="text"],
+        input[type="password"] {
+            width: 100%;
+            padding: 11px 14px;
+            border: 1.5px solid var(--border);
+            border-radius: 7px;
             font-size: 14px;
+            color: var(--text);
+            background: #fafbff;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            font-family: -apple-system, sans-serif;
         }
-        
-        .login-footer a:hover {
-            text-decoration: underline;
+
+        input[type="text"]:focus,
+        input[type="password"]:focus {
+            outline: none;
+            border-color: var(--brand);
+            box-shadow: 0 0 0 3px rgba(26, 86, 219, 0.10);
+            background: #fff;
         }
-        
-        .checkbox-group {
+
+        /* ── Remember me ── */
+        .checkbox-row {
             display: flex;
             align-items: center;
-            margin-bottom: 20px;
+            gap: 8px;
+            margin-bottom: 22px;
         }
-        
-        .checkbox-group input {
-            width: auto;
-            margin-right: 8px;
+
+        .checkbox-row input[type="checkbox"] {
+            width: 16px; height: 16px;
+            accent-color: var(--brand);
+            cursor: pointer;
         }
-        
-        .checkbox-group label {
+
+        .checkbox-row label {
             margin: 0;
-            font-weight: normal;
-            font-size: 14px;
+            font-weight: 400;
+            font-size: 13.5px;
+            color: var(--muted);
+            cursor: pointer;
         }
+
+        /* ── Submit button ── */
+        .btn-signin {
+            width: 100%;
+            padding: 12px;
+            background: var(--brand);
+            color: #fff;
+            border: none;
+            border-radius: 7px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            letter-spacing: 0.3px;
+            transition: background 0.2s, transform 0.15s;
+            font-family: -apple-system, sans-serif;
+        }
+
+        .btn-signin:hover  { background: var(--brand-dark); transform: translateY(-1px); }
+        .btn-signin:active { transform: translateY(0); }
+
+        /* ── Footer ── */
+        .card-footer {
+            margin-top: 22px;
+            padding-top: 18px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-footer a {
+            font-size: 13px;
+            color: var(--brand);
+            text-decoration: none;
+            font-family: -apple-system, sans-serif;
+        }
+
+        .card-footer a:hover { text-decoration: underline; }
+
+        /* ✅ FIX 4: Visible trust/legitimacy notice at the bottom */
+        .trust-notice {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: var(--muted);
+            font-family: -apple-system, sans-serif;
+            line-height: 1.6;
+        }
+
+        .trust-notice a {
+            color: var(--brand);
+            text-decoration: none;
+        }
+
+        .trust-notice a:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
-    <div class="login-container">
-        <div class="login-header">
-            <h1>🔐 JD Analyzer</h1>
-            <p>Sign in to continue</p>
+
+    <!-- ✅ FIX 5: Visible site identity above the card — clearly YOUR product -->
+    <div class="site-identity">
+        <div class="logo-badge">
+            <!-- Simple inline SVG icon — no external image dependency -->
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10
+                         10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4
+                         0h-2V8h2v8z"/>
+            </svg>
+            Kunji Skill Analyzer Pro
         </div>
-        
+        <p>AI-powered Job Description &amp; Skill Analysis Platform</p>
+    </div>
+
+    <div class="login-card">
+        <h1 class="card-title">Welcome back</h1>
+        <p class="card-subtitle">Sign in to your account to continue</p>
+
+        <!-- Django messages -->
         {% if messages %}
             {% for message in messages %}
-                <div class="{% if message.tags == 'error' %}error-message{% else %}success-message{% endif %}">
+                <div class="alert {% if message.tags == 'error' %}alert-error{% else %}alert-success{% endif %}">
                     {{ message }}
                 </div>
             {% endfor %}
         {% endif %}
-        
+
         {% if form.errors %}
-            <div class="error-message">
-                Please correct the errors below.
+            <div class="alert alert-error">
+                Invalid username or password. Please try again.
             </div>
         {% endif %}
-        
-        <form method="post" action="{% url 'login' %}">
+
+        <!-- ✅ FIX 6: Form posts to your own URL, CSRF token present, autocomplete attributes set -->
+        <form method="POST" action="{% url 'login' %}" autocomplete="on" novalidate>
             {% csrf_token %}
-            
+
             <div class="form-group">
                 <label for="id_username">Username</label>
-                <input type="text" 
-                       name="username" 
-                       id="id_username" 
-                       placeholder="Enter your username"
-                       required 
-                       autofocus>
-                {% if form.username.errors %}
-                    <div class="error-message">{{ form.username.errors }}</div>
-                {% endif %}
+                <input
+                    type="text"
+                    name="username"
+                    id="id_username"
+                    placeholder="Your username"
+                    autocomplete="username"
+                    spellcheck="false"
+                    required
+                    autofocus
+                >
             </div>
-            
+
             <div class="form-group">
                 <label for="id_password">Password</label>
-                <input type="password" 
-                       name="password" 
-                       id="id_password" 
-                       placeholder="Enter your password"
-                       required>
-                {% if form.password.errors %}
-                    <div class="error-message">{{ form.password.errors }}</div>
-                {% endif %}
+                <input
+                    type="password"
+                    name="password"
+                    id="id_password"
+                    placeholder="Your password"
+                    autocomplete="current-password"
+                    required
+                >
             </div>
-            
-            <div class="checkbox-group">
+
+            <div class="checkbox-row">
                 <input type="checkbox" name="remember_me" id="remember_me">
-                <label for="remember_me">Remember me</label>
+                <label for="remember_me">Keep me signed in</label>
             </div>
-            
+
             <input type="hidden" name="next" value="{{ next }}">
-            
-            <button type="submit" class="btn-login">Sign In</button>
+
+            <button type="submit" class="btn-signin">Sign In</button>
         </form>
-        
-        <div class="login-footer">
-            <a href="#">Forgot password?</a>
+
+        <div class="card-footer">
+            <!-- ✅ FIX 7: Link to real password reset URL, not dead # -->
+            <a href="{% url 'password_reset' %}">Forgot password?</a>
+            <a href="{% url 'home' %}">← Back to home</a>
         </div>
     </div>
+
+    <!-- ✅ FIX 8: Trust notice — tells Google this is a legitimate service -->
+    <p class="trust-notice">
+        By signing in, you agree to our
+        <a href="/privacy-policy/">Privacy Policy</a> and
+        <a href="/terms/">Terms of Service</a>.<br>
+        &copy; {% now "Y" %} Kunji Skill Analyzer Pro. All rights reserved.
+    </p>
+
 </body>
 </html>

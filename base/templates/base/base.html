@@ -29,10 +29,11 @@
 
         <div>
             <!-- LOGOUT BUTTON (POST FORM) -->
-            <form action="{% url 'logout' %}" method="post" style="display:inline;">
+            <form method="POST" action="/logout/">
                 {% csrf_token %}
-                <button type="submit" class="btn btn-danger">Logout</button>
+                <button type="submit">Logout</button>
             </form>
+            
         </div>
 
     </div>

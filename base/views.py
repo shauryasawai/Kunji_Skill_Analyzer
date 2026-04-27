@@ -157,6 +157,24 @@ def check_object_permission(request, obj):
 # MODIFIED VIEWS WITH TOKEN TRACKING
 # ============================================================
 
+def validate_file_upload(uploaded_file):
+    """Validate uploaded file — handles None, size, and type."""
+    if uploaded_file is None:
+        return False, "No file was provided. Please select a file."
+
+    ALLOWED_EXTENSIONS = ['.pdf', '.doc', '.docx', '.txt']
+    MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
+
+    ext = os.path.splitext(uploaded_file.name)[1].lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        return False, f"Invalid file type '{ext}'. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
+
+    if uploaded_file.size > MAX_FILE_SIZE:
+        return False, "File size exceeds 5MB limit."
+
+    return True, ""
+
+
 @login_required
 @csrf_protect
 @require_http_methods(["GET", "POST"])
@@ -164,27 +182,40 @@ def upload_jd(request):
     """Upload and analyze job description - requires authentication"""
     if request.method == 'POST':
         form = JDUploadForm(request.POST, request.FILES)
-        
+
         if form.is_valid():
+
+            # ✅ FIX 2: Explicit None check BEFORE validate_file_upload
             uploaded_file = request.FILES.get('file')
+            if not uploaded_file:
+                messages.error(request, "Please select a file to upload.")
+                logger.warning(f"No file uploaded by user {request.user.id}")
+                return redirect('upload_jd')
+
             is_valid, error_msg = validate_file_upload(uploaded_file)
-            
             if not is_valid:
                 messages.error(request, error_msg)
                 logger.warning(f"Invalid file upload attempt by user {request.user.id}: {error_msg}")
                 return redirect('upload_jd')
-            
+
             jd = form.save(commit=False)
             jd.created_by = request.user
-            jd.file = request.FILES['file']
+            jd.file = uploaded_file  # reuse already-fetched variable
             jd.save()
-            
+
+            # ✅ FIX 3: Guard .path access after save
+            if not jd.file or not jd.file.name:
+                messages.error(request, "File was not saved correctly. Please try again.")
+                logger.error(f"File save failed for user {request.user.id}")
+                jd.delete()
+                return redirect('upload_jd')
+
             domain = request.POST.get('domain', '')
-            file_path = jd.file.path
-            
+            file_path = jd.file.path  # safe to access now
+
             try:
                 jd_text = extract_text_from_file(file_path)
-                
+
                 if not jd_text:
                     messages.error(request, "Could not extract text from the file.")
                     if os.path.exists(file_path):
@@ -192,27 +223,18 @@ def upload_jd(request):
                     jd.delete()
                     logger.error(f"Text extraction failed for JD {jd.id} by user {request.user.id}")
                     return redirect('upload_jd')
-                
+
                 jd.jd_text = jd_text
-                
-                # ============================================================
-                # MODIFIED: Extract skills with token tracking
-                # ============================================================
                 result = extract_skills_from_jd(jd_text, domain)
-                
-                # Check if token usage was returned
+
                 if 'token_usage' in result:
                     token_usage = result['token_usage']
                     model = result.get('model', 'gpt-4')
-                    
-                    # Calculate cost
                     cost = calculate_openai_cost(
                         token_usage['prompt_tokens'],
                         token_usage['completion_tokens'],
                         model
                     )
-                    
-                    # Log token usage
                     log_token_usage(
                         user=request.user,
                         operation='skill_extraction',
@@ -222,24 +244,18 @@ def upload_jd(request):
                         model=model,
                         cost=cost
                     )
-                    
-                    # Add user-friendly message
                     messages.info(
                         request,
                         f"AI Analysis: {token_usage['total_tokens']} tokens used (${cost:.4f})"
                     )
-                
-                # Get LinkedIn optimized skills
+
                 linkedin_skills = result.get('linkedin_optimized_skills', result.get('all_skills', [])[:10])
-                
-                # Generate LinkedIn search strings
                 search_strings = generate_linkedin_search_strings(
                     linkedin_skills,
                     jd.title,
                     result.get('experience_level', 'Mid Level')
                 )
-                
-                # Update model with comprehensive data
+
                 jd.all_skills = ", ".join(result.get('all_skills', []))
                 jd.linkedin_skills_string = ", ".join(linkedin_skills)
                 jd.linkedin_search_string = json.dumps(search_strings)
@@ -247,10 +263,13 @@ def upload_jd(request):
                 jd.role_category = result.get('role_category', 'Unknown')
                 jd.experience_level = result.get('experience_level', 'Unknown')
                 jd.key_responsibilities = " | ".join(result.get('key_responsibilities', []))
-                jd.qualifications = " | ".join(result.get('qualifications', [])) if isinstance(result.get('qualifications'), list) else result.get('qualifications', '')
+                jd.qualifications = (
+                    " | ".join(result['qualifications'])
+                    if isinstance(result.get('qualifications'), list)
+                    else result.get('qualifications', '')
+                )
                 jd.save()
-                
-                # Save to Excel
+
                 excel_data = {
                     'Job Title': jd.title,
                     'All Skills Required': jd.all_skills,
@@ -264,11 +283,11 @@ def upload_jd(request):
                     'Uploaded By': request.user.username
                 }
                 save_jd_to_excel(excel_data)
-                
+
                 logger.info(f"JD {jd.id} successfully analyzed by user {request.user.id}")
                 messages.success(request, "Job Description analyzed successfully! Original file deleted for security.")
                 return redirect('results', pk=jd.pk)
-                
+
             except Exception as e:
                 logger.error(f"Error processing JD upload by user {request.user.id}: {str(e)}")
                 messages.error(request, "An error occurred while processing the file. Please try again.")
@@ -276,23 +295,23 @@ def upload_jd(request):
                     os.remove(file_path)
                 jd.delete()
                 return redirect('upload_jd')
+
     else:
         form = JDUploadForm()
-    
-    # Show user's token usage stats
+
     token_stats = get_user_token_stats(request.user, days=30)
-    
+
     if request.user.is_staff:
         recent_jds = JobDescription.objects.all()[:10]
     else:
         recent_jds = JobDescription.objects.filter(created_by=request.user)[:10]
-    
+
     context = {
         'form': form,
         'recent_jds': recent_jds,
         'token_stats': token_stats
     }
-    
+
     return render(request, 'base/upload.html', context)
 
 
