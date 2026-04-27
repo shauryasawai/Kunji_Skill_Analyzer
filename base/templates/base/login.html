@@ -1,248 +1,244 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign In - Kunji Skill Analyzer Pro</title>
-    <meta name="description" content="Sign in to Kunji Skill Analyzer Pro - AI-powered job description and skill analysis tool.">
-    <meta name="author" content="Kunji Skill Analyzer Pro">
-    <meta name="robots" content="noindex, nofollow">
+{% extends "base/base.html" %}
+{% load static %}
 
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
+{% block title %}Sign In — Kunji Skill Analyzer Pro{% endblock %}
 
-        /* FIX: wrapper centers card + trust notice together as a column */
-        .page-wrapper {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            width: 100%;
-            max-width: 400px;
-        }
-        
-        .login-container {
-            background: white;
-            padding: 40px;
-            border-radius: 10px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
-            width: 100%;
-        }
-        
-        .login-header {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        
-        .login-header h1 {
-            color: #333;
-            font-size: 28px;
-            margin-bottom: 10px;
-        }
-        
-        .login-header p {
-            color: #666;
-            font-size: 14px;
-        }
-        
-        .form-group {
-            margin-bottom: 20px;
-        }
-        
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            color: #333;
-            font-weight: 500;
-            font-size: 14px;
-        }
-        
-        .form-group input {
-            width: 100%;
-            padding: 12px 15px;
-            border: 2px solid #e1e8ed;
-            border-radius: 5px;
-            font-size: 14px;
-            transition: border-color 0.3s;
-        }
-        
-        .form-group input:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-        
-        .error-message {
-            background: #fee;
-            color: #c33;
-            padding: 12px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            font-size: 14px;
-        }
-        
-        .success-message {
-            background: #efe;
-            color: #3c3;
-            padding: 12px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            font-size: 14px;
-        }
-        
-        .btn-login {
-            width: 100%;
-            padding: 12px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 5px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: transform 0.2s;
-        }
-        
-        .btn-login:hover {
-            transform: translateY(-2px);
-        }
-        
-        .btn-login:active {
-            transform: translateY(0);
-        }
-        
-        .login-footer {
-            text-align: center;
-            margin-top: 20px;
-            padding-top: 20px;
-            border-top: 1px solid #e1e8ed;
-        }
-        
-        .login-footer a {
-            color: #667eea;
-            text-decoration: none;
-            font-size: 14px;
-        }
-        
-        .login-footer a:hover {
-            text-decoration: underline;
-        }
+{% block extra_meta %}
+<meta name="description" content="Sign in to Kunji Skill Analyzer Pro - AI-powered job description and skill analysis tool.">
+<meta name="robots" content="noindex, nofollow">
+{% endblock %}
 
-        .checkbox-group {
-            display: flex;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-        
-        .checkbox-group input {
-            width: auto;
-            margin-right: 8px;
-        }
-        
-        .checkbox-group label {
-            margin: 0;
-            font-weight: normal;
-            font-size: 14px;
-        }
+{% block extra_css %}
+<style>
+    /* ── Page-level layout ──────────────────────────────────────────── */
+    .login-page {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
 
-        /* Trust notice sits neatly below the card */
-        .trust-notice {
-            text-align: center;
-            margin-top: 16px;
-            font-size: 12px;
-            color: rgba(255, 255, 255, 0.75);
-            width: 100%;
-        }
+    /* Centers card + trust notice as a column */
+    .login-page__wrapper {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+        max-width: 400px;
+    }
 
-        .trust-notice a {
-            color: rgba(255, 255, 255, 0.90);
-            text-decoration: underline;
-        }
-    </style>
-</head>
-<body>
+    /* ── Card ───────────────────────────────────────────────────────── */
+    .login-card {
+        background: #fff;
+        padding: 40px;
+        border-radius: 10px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        width: 100%;
+    }
 
-    <!-- FIX: single wrapper keeps card + trust notice centered together -->
-    <div class="page-wrapper">
+    /* ── Header ─────────────────────────────────────────────────────── */
+    .login-card__header {
+        text-align: center;
+        margin-bottom: 30px;
+    }
 
-        <div class="login-container">
-            <div class="login-header">
-                <h1>Kunji Skill Analyzer Pro</h1>
-                <p>Sign in to your account to continue</p>
+    .login-card__title {
+        color: #333;
+        font-size: 28px;
+        margin-bottom: 10px;
+    }
+
+    .login-card__subtitle {
+        color: #666;
+        font-size: 14px;
+    }
+
+    /* ── Alerts ─────────────────────────────────────────────────────── */
+    .alert {
+        padding: 12px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+        font-size: 14px;
+    }
+
+    .alert--error   { background: #fee; color: #c33; }
+    .alert--success { background: #efe; color: #3c3; }
+
+    /* ── Form fields ─────────────────────────────────────────────────── */
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group__label {
+        display: block;
+        margin-bottom: 8px;
+        color: #333;
+        font-weight: 500;
+        font-size: 14px;
+    }
+
+    .form-group__input {
+        width: 100%;
+        padding: 12px 15px;
+        border: 2px solid #e1e8ed;
+        border-radius: 5px;
+        font-size: 14px;
+        transition: border-color 0.3s;
+    }
+
+    .form-group__input:focus {
+        outline: none;
+        border-color: #667eea;
+    }
+
+    /* ── Checkbox row ───────────────────────────────────────────────── */
+    .checkbox-row {
+        display: flex;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+
+    .checkbox-row__input {
+        margin-right: 8px;
+    }
+
+    .checkbox-row__label {
+        font-size: 14px;
+        color: #333;
+    }
+
+    /* ── Submit button ──────────────────────────────────────────────── */
+    .btn-login {
+        width: 100%;
+        padding: 12px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: #fff;
+        border: none;
+        border-radius: 5px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.2s;
+    }
+
+    .btn-login:hover  { transform: translateY(-2px); }
+    .btn-login:active { transform: translateY(0); }
+
+    /* ── Footer / trust notice ──────────────────────────────────────── */
+    .login-card__footer {
+        text-align: center;
+        margin-top: 20px;
+        padding-top: 20px;
+        border-top: 1px solid #e1e8ed;
+    }
+
+    .login-card__footer a {
+        color: #667eea;
+        text-decoration: none;
+        font-size: 14px;
+    }
+
+    .login-card__footer a:hover { text-decoration: underline; }
+
+    .trust-notice {
+        text-align: center;
+        margin-top: 16px;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.75);
+        width: 100%;
+    }
+
+    .trust-notice a {
+        color: rgba(255, 255, 255, 0.9);
+        text-decoration: underline;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="login-page">
+    <div class="login-page__wrapper">
+
+        <div class="login-card">
+
+            <!-- Header -->
+            <div class="login-card__header">
+                <h1 class="login-card__title">Kunji Skill Analyzer Pro</h1>
+                <p class="login-card__subtitle">Sign in to your account to continue</p>
             </div>
-            
+
+            <!-- Django messages -->
             {% if messages %}
                 {% for message in messages %}
-                    <div class="{% if message.tags == 'error' %}error-message{% else %}success-message{% endif %}">
+                    <div class="alert alert--{% if message.tags == 'error' %}error{% else %}success{% endif %}">
                         {{ message }}
                     </div>
                 {% endfor %}
             {% endif %}
-            
+
+            <!-- Form-level auth error -->
             {% if form.errors %}
-                <div class="error-message">
+                <div class="alert alert--error">
                     Invalid username or password. Please try again.
                 </div>
             {% endif %}
-            
+
+            <!-- Sign-in form -->
             <form method="POST" action="{% url 'login' %}" autocomplete="on">
                 {% csrf_token %}
-                
+
+                <!-- Username -->
                 <div class="form-group">
-                    <label for="id_username">Username</label>
-                    <input type="text" 
-                           name="username" 
-                           id="id_username" 
+                    <label class="form-group__label" for="id_username">Username</label>
+                    <input class="form-group__input"
+                           type="text"
+                           name="username"
+                           id="id_username"
                            placeholder="Enter your username"
                            autocomplete="username"
                            spellcheck="false"
-                           required 
+                           required
                            autofocus>
                     {% if form.username.errors %}
-                        <div class="error-message">{{ form.username.errors }}</div>
+                        <div class="alert alert--error">{{ form.username.errors }}</div>
                     {% endif %}
                 </div>
-                
+
+                <!-- Password -->
                 <div class="form-group">
-                    <label for="id_password">Password</label>
-                    <input type="password" 
-                           name="password" 
-                           id="id_password" 
+                    <label class="form-group__label" for="id_password">Password</label>
+                    <input class="form-group__input"
+                           type="password"
+                           name="password"
+                           id="id_password"
                            placeholder="Enter your password"
                            autocomplete="current-password"
                            required>
                     {% if form.password.errors %}
-                        <div class="error-message">{{ form.password.errors }}</div>
+                        <div class="alert alert--error">{{ form.password.errors }}</div>
                     {% endif %}
                 </div>
-                
-                <div class="checkbox-group">
-                    <input type="checkbox" name="remember_me" id="remember_me">
-                    <label for="remember_me">Remember me</label>
+
+                <!-- Remember me -->
+                <div class="checkbox-row">
+                    <input class="checkbox-row__input"
+                           type="checkbox"
+                           name="remember_me"
+                           id="remember_me">
+                    <label class="checkbox-row__label" for="remember_me">Remember me</label>
                 </div>
-                
+
                 <input type="hidden" name="next" value="{{ next }}">
-                
+
                 <button type="submit" class="btn-login">Sign In</button>
             </form>
-            
-            <div class="login-footer">
-            </div>
+
+            <div class="login-card__footer"></div>
         </div>
 
-        <!-- Trust notice aligned directly under the card -->
+        <!-- Trust notice below card -->
         <p class="trust-notice">
             &copy; {% now "Y" %} Kunji Skill Analyzer Pro &nbsp;|&nbsp;
             <a href="/privacy-policy/">Privacy Policy</a> &nbsp;|&nbsp;
@@ -250,6 +246,5 @@
         </p>
 
     </div>
-
-</body>
-</html>
+</div>
+{% endblock %}
