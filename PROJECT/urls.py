@@ -8,7 +8,7 @@ from base.views import google_verify
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('base.urls')),
-    path('google.html', google_verify),
+    path('google63d0dde2db21043b.html', google_verify),
 ]
 
 if settings.DEBUG:
