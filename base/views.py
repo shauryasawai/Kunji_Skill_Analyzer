@@ -840,3 +840,7 @@ def clear_token_cache(request):
     cache.delete(cache_key)
     messages.success(request, "Token statistics refreshed successfully!")
     return redirect('token_usage_dashboard')
+
+def google_verify(request):
+    file_path = os.path.join(settings.BASE_DIR, 'static/google63d0dde2db21043b.html')
+    return FileResponse(open(file_path, 'rb'), content_type='text/html')
