@@ -201,9 +201,8 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10MB
 # SECURE_HSTS_PRELOAD = False  # Set to True in production
 
 # Login/Logout URLs
-LOGIN_URL = 'login'
-LOGIN_REDIRECT_URL = 'upload_jd'
-LOGOUT_REDIRECT_URL = 'login'
+LOGIN_URL = '/login/'
+LOGIN_REDIRECT_URL = '/upload_jd/'
 
 # File Upload Security
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10MB
