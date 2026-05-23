@@ -725,4 +725,6 @@ def clear_token_cache(request):
 
 def google_verify(request):
     file_path = os.path.join(settings.BASE_DIR, "static/google63d0dde2db21043b.html")
+    if not os.path.exists(file_path):
+        raise Http404
     return FileResponse(open(file_path, "rb"), content_type="text/html")
