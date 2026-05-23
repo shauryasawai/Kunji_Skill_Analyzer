@@ -21,8 +21,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-lo7z9zeeo!i*@48g3h-2qff1=o)!x$6c^w3twsh-=yi)g!7av!'
-
+SECRET_KEY = config('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
@@ -34,7 +33,7 @@ ALLOWED_HOSTS = [
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost:8000',
     'http://127.0.0.1:8000',
-    'https://kunji-skill-analyzer-pro.vercel.app/',
+    'https://kunji-skill-analyzer.vercel.app/',
 ]
 
 CSP_STYLE_SRC = ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"]
@@ -50,6 +49,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'base',
+    'csp',
 ]
 
 MIDDLEWARE = [
@@ -59,7 +59,9 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',]
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'csp.middleware.CSPMiddleware'
+     ]
 
 ROOT_URLCONF = 'PROJECT.urls'
 
@@ -173,17 +175,6 @@ EXCEL_DATABASE_PATH = DATA_DIR / 'jd_database.xlsx'
 SKILLS_MAP_PATH = DATA_DIR / 'skills_map.json'
 
 
-# # HTTPS/SSL Settings (Enable in production)
-# SECURE_SSL_REDIRECT = False  # Set to True in production
-# SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-# SESSION_COOKIE_SECURE = False  # Set to True in production
-# CSRF_COOKIE_SECURE = False  # Set to True in production
-
-# # Cookie Security
-# SESSION_COOKIE_HTTPONLY = True
-# CSRF_COOKIE_HTTPONLY = True
-# SESSION_COOKIE_SAMESITE = 'Lax'
-# CSRF_COOKIE_SAMESITE = 'Lax'
 
 # # Session Security
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
@@ -195,15 +186,28 @@ SESSION_COOKIE_SAMESITE = 'Lax'
 
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10MB
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10MB
-# # Security Headers
-# SECURE_CONTENT_TYPE_NOSNIFF = True
-# SECURE_BROWSER_XSS_FILTER = True
-# X_FRAME_OPTIONS = 'DENY'
 
-# # HSTS (HTTP Strict Transport Security) - Enable in production
-# SECURE_HSTS_SECONDS = 0  # Set to 31536000 (1 year) in production
-# SECURE_HSTS_INCLUDE_SUBDOMAINS = False  # Set to True in production
-# SECURE_HSTS_PRELOAD = False  # Set to True in production
+
+############################
+SECURE_SSL_REDIRECT = True
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SAMESITE = 'Lax'
+
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_BROWSER_XSS_FILTER = True
+X_FRAME_OPTIONS = 'DENY'
+
+SECURE_HSTS_SECONDS = 31536000
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = True
+
+###########################################
 
 # Login/Logout URLs
 LOGIN_URL = '/login/'
@@ -220,7 +224,17 @@ CSRF_FAILURE_VIEW = 'django.views.csrf.csrf_failure'
 CSRF_USE_SESSIONS = False
 CSRF_COOKIE_NAME = 'csrftoken'
 
-
+###################################
+CONTENT_SECURITY_POLICY = {
+    "DIRECTIVES": {
+        "default-src": ["'self'"],
+        "style-src": ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
+        "script-src": ["'self'", "https://cdn.jsdelivr.net"],
+        "img-src": ["'self'", "data:"],
+        "frame-ancestors": ["'none'"],
+    },
+}
+#####################################
 
 from dotenv import load_dotenv
 import os
