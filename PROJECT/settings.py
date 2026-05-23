@@ -26,7 +26,11 @@ SECRET_KEY = 'django-insecure-lo7z9zeeo!i*@48g3h-2qff1=o)!x$6c^w3twsh-=yi)g!7av!
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
-ALLOWED_HOSTS = ['kunji-skill-analyzer.vercel.app']
+ALLOWED_HOSTS = [
+    ".vercel.app",
+    "kunji-skill-analyzer.vercel.app",
+]
+
 CSRF_TRUSTED_ORIGINS = [
     'http://localhost:8000',
     'http://127.0.0.1:8000',
