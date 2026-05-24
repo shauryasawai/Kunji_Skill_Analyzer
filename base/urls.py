@@ -5,6 +5,7 @@ from . import views
 
 urlpatterns = [
     # ── Auth (custom views) ───────────────────────────────────────────────
+    path('',TemplateView.as_view(template_name='home.html'),name='home'),
     path("login/",   views.login_view,  name="login"),
     path("logout/",  views.logout_view, name="logout"),
 
