@@ -122,11 +122,12 @@ href="{% url 'upload_jd' %}">
 
 <div>
 
-<a
-class="btn btn-outline-light me-2"
-href="javascript:history.back()">
-Back
-</a>
+<button
+  type="button"
+  class="btn btn-outline-light me-2"
+  onclick="history.back()">
+  Back
+</button>
 
 {% if user.is_authenticated %}
 
