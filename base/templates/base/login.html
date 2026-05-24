@@ -1,247 +1,851 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign In - Kunji Skill Analyzer Pro</title>
-    <meta name="description" content="Sign in to Kunji Skill Analyzer Pro - AI-powered job description and skill analysis tool.">
-    <meta name="author" content="Kunji Skill Analyzer Pro">
-    <meta name="robots" content="noindex, nofollow">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kunji Search — by Market Scope</title>
+<meta name="description" content="Find the best-fit candidates for any role instantly. Kunji Search by Market Scope scans your internal talent pool and external networks against your job description.">
+<meta name="robots" content="index, follow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
+<style>
+  *, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
 
-        /* FIX: wrapper centers card + trust notice together as a column */
-        .page-wrapper {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            width: 100%;
-            max-width: 400px;
-        }
-        
-        .login-container {
-            background: white;
-            padding: 40px;
-            border-radius: 10px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
-            width: 100%;
-        }
-        
-        .login-header {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        
-        .login-header h1 {
-            color: #333;
-            font-size: 28px;
-            margin-bottom: 10px;
-        }
-        
-        .login-header p {
-            color: #666;
-            font-size: 14px;
-        }
-        
-        .form-group {
-            margin-bottom: 20px;
-        }
-        
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            color: #333;
-            font-weight: 500;
-            font-size: 14px;
-        }
-        
-        .form-group input {
-            width: 100%;
-            padding: 12px 15px;
-            border: 2px solid #e1e8ed;
-            border-radius: 5px;
-            font-size: 14px;
-            transition: border-color 0.3s;
-        }
-        
-        .form-group input:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-        
-        .error-message {
-            background: #fee;
-            color: #c33;
-            padding: 12px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            font-size: 14px;
-        }
-        
-        .success-message {
-            background: #efe;
-            color: #3c3;
-            padding: 12px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            font-size: 14px;
-        }
-        
-        .btn-login {
-            width: 100%;
-            padding: 12px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 5px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: transform 0.2s;
-        }
-        
-        .btn-login:hover {
-            transform: translateY(-2px);
-        }
-        
-        .btn-login:active {
-            transform: translateY(0);
-        }
-        
-        .login-footer {
-            text-align: center;
-            margin-top: 20px;
-            padding-top: 20px;
-            border-top: 1px solid #e1e8ed;
-        }
-        
-        .login-footer a {
-            color: #667eea;
-            text-decoration: none;
-            font-size: 14px;
-        }
-        
-        .login-footer a:hover {
-            text-decoration: underline;
-        }
+  :root {
+    --purple-deep:   #4a3f9f;
+    --purple-mid:    #667eea;
+    --purple-rich:   #764ba2;
+    --purple-light:  #a78bfa;
+    --purple-pale:   #ede9fe;
+    --white:         #ffffff;
+    --off-white:     #f8f7ff;
+    --text-body:     #2d2a4a;
+    --text-muted:    #6b6894;
+    --border-light:  rgba(102,126,234,0.15);
+    --border-mid:    rgba(102,126,234,0.3);
+  }
 
-        .checkbox-group {
-            display: flex;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-        
-        .checkbox-group input {
-            width: auto;
-            margin-right: 8px;
-        }
-        
-        .checkbox-group label {
-            margin: 0;
-            font-weight: normal;
-            font-size: 14px;
-        }
+  html { scroll-behavior: smooth; }
 
-        /* Trust notice sits neatly below the card */
-        .trust-notice {
-            text-align: center;
-            margin-top: 16px;
-            font-size: 12px;
-            color: rgba(255, 255, 255, 0.75);
-            width: 100%;
-        }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: #0e0c1e;
+    color: var(--white);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
 
-        .trust-notice a {
-            color: rgba(255, 255, 255, 0.90);
-            text-decoration: underline;
-        }
-    </style>
+  /* ── Background canvas ── */
+  .bg-canvas {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background:
+      radial-gradient(ellipse 80% 60% at 20% 10%, rgba(102,126,234,0.35) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 50% at 80% 80%, rgba(118,75,162,0.4) 0%, transparent 55%),
+      radial-gradient(ellipse 50% 40% at 50% 40%, rgba(74,63,159,0.2) 0%, transparent 70%),
+      linear-gradient(160deg, #0e0c1e 0%, #1a1535 50%, #0e0c1e 100%);
+    pointer-events: none;
+  }
+
+  /* Subtle grid overlay */
+  .bg-canvas::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(102,126,234,0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(102,126,234,0.06) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+
+  /* ── Layout ── */
+  .page-wrap {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ── Nav ── */
+  nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 24px 48px;
+    border-bottom: 1px solid rgba(102,126,234,0.12);
+    backdrop-filter: blur(12px);
+    background: rgba(14,12,30,0.5);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .nav-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -0.3px;
+    color: var(--white);
+    text-decoration: none;
+  }
+
+  .logo-mark {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    background: linear-gradient(135deg, var(--purple-mid), var(--purple-rich));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'DM Serif Display', serif;
+    font-size: 17px;
+    color: white;
+    flex-shrink: 0;
+  }
+
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    list-style: none;
+  }
+
+  .nav-links a {
+    color: rgba(255,255,255,0.65);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 400;
+    transition: color 0.2s;
+  }
+
+  .nav-links a:hover { color: white; }
+
+  .nav-cta {
+    padding: 9px 20px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, var(--purple-mid), var(--purple-rich));
+    color: white !important;
+    font-weight: 500 !important;
+    font-size: 14px !important;
+    transition: opacity 0.2s, transform 0.2s !important;
+  }
+
+  .nav-cta:hover { opacity: 0.9; transform: translateY(-1px); }
+
+  /* ── Hero ── */
+  .hero {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 110px 24px 90px;
+    text-align: center;
+  }
+
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 16px;
+    border-radius: 100px;
+    border: 1px solid rgba(102,126,234,0.35);
+    background: rgba(102,126,234,0.1);
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--purple-light);
+    margin-bottom: 36px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  .badge-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--purple-light);
+    animation: pulse-dot 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.8); }
+  }
+
+  .hero h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(42px, 7vw, 72px);
+    line-height: 1.1;
+    letter-spacing: -1px;
+    margin-bottom: 28px;
+    color: var(--white);
+  }
+
+  .hero h1 em {
+    font-style: italic;
+    background: linear-gradient(90deg, #a78bfa, #c084fc, #667eea);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hero p {
+    font-size: 18px;
+    line-height: 1.75;
+    color: rgba(255,255,255,0.6);
+    max-width: 580px;
+    margin: 0 auto 48px;
+    font-weight: 300;
+  }
+
+  .hero-actions {
+    display: flex;
+    gap: 14px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 28px;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all 0.22s ease;
+    cursor: pointer;
+    border: none;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #7c6af5, #a855f7);
+    color: white;
+    box-shadow: 0 0 0 1px rgba(124,106,245,0.4), 0 4px 24px rgba(124,106,245,0.25);
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 0 1px rgba(124,106,245,0.6), 0 8px 32px rgba(124,106,245,0.4);
+  }
+
+  .btn-outline {
+    background: rgba(255,255,255,0.05);
+    color: rgba(255,255,255,0.8);
+    border: 1px solid rgba(255,255,255,0.15);
+    backdrop-filter: blur(8px);
+  }
+
+  .btn-outline:hover {
+    background: rgba(255,255,255,0.1);
+    color: white;
+    transform: translateY(-2px);
+  }
+
+  .btn-arrow {
+    font-size: 16px;
+    transition: transform 0.2s;
+  }
+
+  .btn-primary:hover .btn-arrow { transform: translateX(3px); }
+
+  /* ── Stats strip ── */
+  .stats-strip {
+    max-width: 800px;
+    margin: 0 auto 0;
+    padding: 0 24px 80px;
+    display: flex;
+    justify-content: center;
+    gap: 0;
+  }
+
+  .stat-item {
+    flex: 1;
+    text-align: center;
+    padding: 28px 20px;
+    border-right: 1px solid rgba(102,126,234,0.15);
+    position: relative;
+  }
+
+  .stat-item:last-child { border-right: none; }
+
+  .stat-number {
+    font-family: 'DM Serif Display', serif;
+    font-size: 36px;
+    color: white;
+    display: block;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+
+  .stat-label {
+    font-size: 12.5px;
+    color: rgba(255,255,255,0.4);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    font-weight: 400;
+  }
+
+  /* ── Section wrapper ── */
+  .section-wrap {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 24px 100px;
+  }
+
+  .section-label {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--purple-light);
+    margin-bottom: 14px;
+  }
+
+  .section-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(28px, 4vw, 40px);
+    color: white;
+    line-height: 1.2;
+    margin-bottom: 16px;
+  }
+
+  .section-subtitle {
+    font-size: 16px;
+    color: rgba(255,255,255,0.5);
+    line-height: 1.7;
+    max-width: 520px;
+    font-weight: 300;
+  }
+
+  /* ── Features ── */
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2px;
+    margin-top: 60px;
+    border: 2px solid rgba(102,126,234,0.15);
+    border-radius: 20px;
+    overflow: hidden;
+    background: rgba(102,126,234,0.08);
+  }
+
+  .feature-card {
+    padding: 40px 32px;
+    background: rgba(14,12,30,0.6);
+    backdrop-filter: blur(16px);
+    transition: background 0.3s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .feature-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(102,126,234,0.4), transparent);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .feature-card:hover { background: rgba(102,126,234,0.08); }
+  .feature-card:hover::before { opacity: 1; }
+
+  .feature-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    border: 1px solid rgba(102,126,234,0.3);
+    background: rgba(102,126,234,0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 24px;
+    font-size: 20px;
+  }
+
+  .feature-card h3 {
+    font-size: 17px;
+    font-weight: 600;
+    color: white;
+    margin-bottom: 12px;
+    letter-spacing: -0.2px;
+  }
+
+  .feature-card p {
+    font-size: 14px;
+    color: rgba(255,255,255,0.45);
+    line-height: 1.7;
+    font-weight: 300;
+  }
+
+  /* ── How it works ── */
+  .how-section {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 24px 100px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 80px;
+    align-items: center;
+  }
+
+  .steps-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin-top: 40px;
+  }
+
+  .step {
+    display: flex;
+    gap: 20px;
+    padding: 24px 0;
+    border-bottom: 1px solid rgba(102,126,234,0.1);
+    position: relative;
+  }
+
+  .step:last-child { border-bottom: none; }
+
+  .step-num {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 1px solid rgba(102,126,234,0.3);
+    background: rgba(102,126,234,0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--purple-light);
+    margin-top: 2px;
+  }
+
+  .step h4 {
+    font-size: 15px;
+    font-weight: 500;
+    color: white;
+    margin-bottom: 6px;
+    letter-spacing: -0.1px;
+  }
+
+  .step p {
+    font-size: 13.5px;
+    color: rgba(255,255,255,0.45);
+    line-height: 1.65;
+    font-weight: 300;
+  }
+
+  /* Visual mockup panel */
+  .mockup-panel {
+    border-radius: 20px;
+    border: 1px solid rgba(102,126,234,0.2);
+    background: rgba(14,12,30,0.8);
+    padding: 28px;
+    backdrop-filter: blur(20px);
+    box-shadow: 0 40px 80px rgba(0,0,0,0.4);
+  }
+
+  .mockup-topbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .dot-r { background: #ff5f57; }
+  .dot-y { background: #ffbd2e; }
+  .dot-g { background: #28c840; }
+
+  .mockup-title {
+    font-size: 12px;
+    color: rgba(255,255,255,0.25);
+    margin-left: auto;
+    font-family: monospace;
+    letter-spacing: 0.3px;
+  }
+
+  .skill-bar-group { margin-bottom: 18px; }
+
+  .skill-bar-top {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 7px;
+  }
+
+  .skill-name {
+    font-size: 12px;
+    color: rgba(255,255,255,0.6);
+  }
+
+  .skill-pct {
+    font-size: 12px;
+    color: var(--purple-light);
+    font-weight: 500;
+  }
+
+  .skill-track {
+    height: 5px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.07);
+    overflow: hidden;
+  }
+
+  .skill-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: linear-gradient(90deg, var(--purple-mid), var(--purple-rich));
+    animation: grow-bar 1.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    transform-origin: left;
+  }
+
+  @keyframes grow-bar {
+    from { transform: scaleX(0); }
+    to   { transform: scaleX(1); }
+  }
+
+  .mockup-tag-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 22px;
+    padding-top: 22px;
+    border-top: 1px solid rgba(102,126,234,0.12);
+  }
+
+  .m-tag {
+    padding: 4px 12px;
+    border-radius: 100px;
+    font-size: 11px;
+    font-weight: 500;
+    border: 1px solid rgba(102,126,234,0.3);
+    background: rgba(102,126,234,0.1);
+    color: rgba(167,139,250,0.9);
+  }
+
+  .m-tag.gap {
+    border-color: rgba(239,68,68,0.3);
+    background: rgba(239,68,68,0.08);
+    color: rgba(252,165,165,0.9);
+  }
+
+  /* ── CTA strip ── */
+  .cta-strip {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 24px 100px;
+  }
+
+  .cta-inner {
+    border-radius: 24px;
+    background: linear-gradient(135deg, rgba(102,126,234,0.15), rgba(118,75,162,0.2));
+    border: 1px solid rgba(102,126,234,0.25);
+    padding: 72px 60px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .cta-inner::before {
+    content: '';
+    position: absolute;
+    top: -60px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 500px;
+    height: 200px;
+    border-radius: 50%;
+    background: radial-gradient(ellipse, rgba(102,126,234,0.2), transparent 70%);
+    pointer-events: none;
+  }
+
+  .cta-inner h2 {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(26px, 4vw, 40px);
+    color: white;
+    margin-bottom: 16px;
+    position: relative;
+  }
+
+  .cta-inner p {
+    font-size: 16px;
+    color: rgba(255,255,255,0.5);
+    max-width: 440px;
+    margin: 0 auto 40px;
+    line-height: 1.7;
+    font-weight: 300;
+    position: relative;
+  }
+
+  /* ── Footer ── */
+  footer {
+    border-top: 1px solid rgba(102,126,234,0.1);
+    padding: 36px 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .footer-brand {
+    font-size: 14px;
+    color: rgba(255,255,255,0.35);
+  }
+
+  .footer-links {
+    display: flex;
+    gap: 28px;
+  }
+
+  .footer-links a {
+    font-size: 13px;
+    color: rgba(255,255,255,0.35);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+
+  .footer-links a:hover { color: rgba(255,255,255,0.7); }
+
+  /* ── Animations ── */
+  .fade-up {
+    opacity: 0;
+    transform: translateY(24px);
+    animation: fade-up 0.7s ease forwards;
+  }
+
+  @keyframes fade-up {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .delay-1 { animation-delay: 0.1s; }
+  .delay-2 { animation-delay: 0.22s; }
+  .delay-3 { animation-delay: 0.34s; }
+  .delay-4 { animation-delay: 0.46s; }
+  .delay-5 { animation-delay: 0.58s; }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    nav { padding: 18px 20px; }
+    .nav-links { display: none; }
+    .hero { padding: 72px 20px 60px; }
+    .stats-strip { flex-direction: column; padding-bottom: 60px; }
+    .stat-item { border-right: none; border-bottom: 1px solid rgba(102,126,234,0.15); padding: 20px; }
+    .stat-item:last-child { border-bottom: none; }
+    .features-grid { grid-template-columns: 1fr; }
+    .how-section { grid-template-columns: 1fr; gap: 40px; }
+    .cta-inner { padding: 48px 28px; }
+    footer { flex-direction: column; text-align: center; padding: 28px 20px; }
+  }
+</style>
 </head>
 <body>
 
-    <!-- FIX: single wrapper keeps card + trust notice centered together -->
-    <div class="page-wrapper">
+<div class="bg-canvas"></div>
 
-        <div class="login-container">
-            <div class="login-header">
-                <h1>Kunji Skill Analyzer Pro</h1>
-                <p>Sign in to your account to continue</p>
-            </div>
-            
-            {% if messages %}
-                {% for message in messages %}
-                    <div class="{% if message.tags == 'error' %}error-message{% else %}success-message{% endif %}">
-                        {{ message }}
-                    </div>
-                {% endfor %}
-            {% endif %}
-            
-            {% if form.errors %}
-                <div class="error-message">
-                    Invalid username or password. Please try again.
-                </div>
-            {% endif %}
-            
-            <form method="POST" action="{% url 'login' %}" autocomplete="on">
-                {% csrf_token %}
-                
-                <div class="form-group">
-                    <label for="id_username">Username</label>
-                    <input type="text" 
-                           name="username" 
-                           id="id_username" 
-                           placeholder="Enter your username"
-                           autocomplete="username"
-                           spellcheck="false"
-                           required 
-                           autofocus>
-                    {% if form.username.errors %}
-                        <div class="error-message">{{ form.username.errors }}</div>
-                    {% endif %}
-                </div>
-                
-                <div class="form-group">
-                    <label for="id_password">Password</label>
-                    <input type="password" 
-                           name="password" 
-                           id="id_password" 
-                           placeholder="Enter your password"
-                           autocomplete="current-password"
-                           required>
-                    {% if form.password.errors %}
-                        <div class="error-message">{{ form.password.errors }}</div>
-                    {% endif %}
-                </div>
-                
-                <div class="checkbox-group">
-                    <input type="checkbox" name="remember_me" id="remember_me">
-                    <label for="remember_me">Remember me</label>
-                </div>
-                
-                <input type="hidden" name="next" value="{{ next }}">
-                
-                <button type="submit" class="btn-login">Sign In</button>
-            </form>
-            
-            <div class="login-footer">
-            </div>
-        </div>
+<div class="page-wrap">
+
+  <!-- Nav -->
+  <nav>
+    <a href="#" class="nav-logo">
+      <div class="logo-mark">K</div>
+      Kunji Search
+    </a>
+    <ul class="nav-links">
+      <li><a href="{% url 'about' %}">About</a></li>
+      <li><a href="{% url 'privacy' %}">Privacy</a></li>
+      <li><a href="{% url 'terms' %}">Terms</a></li>
+      <li><a href="{% url 'login' %}" class="nav-cta">Sign In</a></li>
+    </ul>
+  </nav>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-badge fade-up">
+      <div class="badge-dot"></div>
+      AI-Powered Talent Intelligence · by Market Scope
     </div>
 
+    <h1 class="fade-up delay-1">
+      Find your <em>perfect hire</em><br>
+      before the search<br>
+      even begins
+    </h1>
+
+    <p class="fade-up delay-2">
+      Paste a job description and let Kunji Search surface your best-fit candidates
+      from your internal talent pool or the wider market ranked and ready.
+    </p>
+
+    <div class="hero-actions fade-up delay-3">
+      <a href="{% url 'login' %}" class="btn btn-primary">
+        Start Searching
+        <span class="btn-arrow">→</span>
+      </a>
+      <a href="{% url 'about' %}" class="btn btn-outline">
+        Learn More
+      </a>
+    </div>
+  </section>
+
+  <!-- Stats -->
+  <div class="stats-strip fade-up delay-4">
+    <div class="stat-item">
+      <span class="stat-number">98%</span>
+      <span class="stat-label">Match precision</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-number">10×</span>
+      <span class="stat-label">Faster shortlisting</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-number">2 modes</span>
+      <span class="stat-label">Internal &amp; External</span>
+    </div>
+  </div>
+
+  <!-- Features -->
+  <div class="section-wrap">
+    <span class="section-label fade-up">Two Search Modes</span>
+    <h2 class="section-title fade-up">One platform,<br>every talent source</h2>
+    <p class="section-subtitle fade-up">Whether your next hire is already in your pipeline or yet to be discovered Kunji Search finds them.</p>
+
+    <div class="features-grid fade-up delay-2">
+      <div class="feature-card">
+        <div class="feature-icon">🏢</div>
+        <h3>Internal Search</h3>
+        <p>Scan your existing talent pool, ATS records, and past applicants. Rediscover strong candidates already familiar with your organisation zero sourcing cost.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🌐</div>
+        <h3>External Search</h3>
+        <p>Reach beyond your database to surface best-fit profiles from the broader market. AI ranks candidates by relevance to your exact job description before you ever make contact.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🎯</div>
+        <h3>JD-Driven Matching</h3>
+        <p>Paste any job description and Kunji's engine extracts role requirements, weights must-haves, and scores every candidate so your shortlist is ready in minutes.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- How it works -->
+  <div class="how-section">
+    <div>
+      <span class="section-label">How It Works</span>
+      <h2 class="section-title">From job description<br>to shortlist in minutes</h2>
+      <div class="steps-list">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div>
+            <h4>Paste the job description</h4>
+            <p>Drop in any JD File. Kunji extracts requirements, weights priorities, and understands the role in full.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div>
+            <h4>Choose your search mode</h4>
+            <p>Run an Internal Search across your talent pool, an External Search across the market, or both simultaneously.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div>
+            <h4>Review your ranked shortlist</h4>
+            <p>Receive a scored, ranked list of candidates with a per-requirement breakdown so you can act with confidence, not guesswork.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mockup -->
+    <div class="mockup-panel">
+      <div class="mockup-topbar">
+        <div class="dot dot-r"></div>
+        <div class="dot dot-y"></div>
+        <div class="dot dot-g"></div>
+        <span class="mockup-title">kunji-search · Senior PM Role</span>
+      </div>
+
+      <div style="display:flex;gap:6px;margin-bottom:20px;">
+        <div style="padding:5px 13px;border-radius:100px;font-size:11px;font-weight:600;background:rgba(102,126,234,0.2);border:1px solid rgba(102,126,234,0.4);color:rgba(167,139,250,0.95);">🏢 Internal · 4 found</div>
+        <div style="padding:5px 13px;border-radius:100px;font-size:11px;font-weight:500;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.4);">🌐 External · 18 found</div>
+      </div>
+
+      <div style="font-size:11px;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">Top Candidates</div>
+
+      <div class="skill-bar-group">
+        <div class="skill-bar-top">
+          <span class="skill-name">Priya Sharma &nbsp;<span style="font-size:10px;color:rgba(255,255,255,0.3);">· 6 yrs exp</span></span>
+          <span class="skill-pct">96%</span>
+        </div>
+        <div class="skill-track"><div class="skill-fill" style="width:96%"></div></div>
+      </div>
+      <div class="skill-bar-group">
+        <div class="skill-bar-top">
+          <span class="skill-name">Arun Mehta &nbsp;<span style="font-size:10px;color:rgba(255,255,255,0.3);">· 5 yrs exp</span></span>
+          <span class="skill-pct">88%</span>
+        </div>
+        <div class="skill-track"><div class="skill-fill" style="width:88%;animation-delay:0.15s"></div></div>
+      </div>
+      <div class="skill-bar-group">
+        <div class="skill-bar-top">
+          <span class="skill-name">Leila Osei &nbsp;<span style="font-size:10px;color:rgba(255,255,255,0.3);">· 4 yrs exp</span></span>
+          <span class="skill-pct">74%</span>
+        </div>
+        <div class="skill-track"><div class="skill-fill" style="width:74%;animation-delay:0.3s;background:linear-gradient(90deg,#eab308,#f97316)"></div></div>
+      </div>
+      <div class="skill-bar-group">
+        <div class="skill-bar-top">
+          <span class="skill-name">James Liu &nbsp;<span style="font-size:10px;color:rgba(255,255,255,0.3);">· 3 yrs exp</span></span>
+          <span class="skill-pct">61%</span>
+        </div>
+        <div class="skill-track"><div class="skill-fill" style="width:61%;animation-delay:0.45s;background:linear-gradient(90deg,#eab308,#f97316)"></div></div>
+      </div>
+
+      <div class="mockup-tag-row">
+        <span class="m-tag">Product Strategy ✓</span>
+        <span class="m-tag">Agile ✓</span>
+        <span class="m-tag">Roadmapping ✓</span>
+        <span class="m-tag gap">B2B SaaS ✗</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- CTA -->
+  <div class="cta-strip">
+    <div class="cta-inner">
+      <h2>Ready to find your next hire?</h2>
+      <p>Give recruiters the intelligence to shortlist faster, smarter, and with far less noise.</p>
+      <a href="{% url 'login' %}" class="btn btn-primary">
+        Get Started
+        <span class="btn-arrow">→</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <span class="footer-brand">© 2025 Market Scope · Kunji Search</span>
+    <div class="footer-links">
+      <a href="{% url 'about' %}">About</a>
+      <a href="{% url 'privacy' %}">Privacy</a>
+      <a href="{% url 'terms' %}">Terms</a>
+    </div>
+  </footer>
+
+</div>
 </body>
 </html>

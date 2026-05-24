@@ -1,10 +1,11 @@
 from django.urls import path
 from django.contrib.auth import views as auth_views
+from django.views.generic import TemplateView
 from . import views
 
 urlpatterns = [
     # ── Auth (custom views) ───────────────────────────────────────────────
-    path("",   views.login_view,  name="login"),
+    path("login/",   views.login_view,  name="login"),
     path("logout/",  views.logout_view, name="logout"),
 
     # Password change still uses Django's built-in views (no custom logic needed)
@@ -41,4 +42,7 @@ urlpatterns = [
 
     # ── Google site verification ──────────────────────────────────────────
     path("google63d0dde2db21043b.html", views.google_verify, name="google_verify"),
-]
+    path('about/',TemplateView.as_view(template_name='about.html'), name='about'),
+    path('privacy/',TemplateView.as_view(template_name='privacy.html'),name='privacy'),
+    path('terms/',TemplateView.as_view(template_name='terms.html'),name='terms'),
+    ]
