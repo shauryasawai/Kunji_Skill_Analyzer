@@ -122,12 +122,14 @@ href="{% url 'upload_jd' %}">
 
 <div>
 
+{% if request.resolver_match.url_name != 'upload_jd' %}
 <button
   type="button"
   class="btn btn-outline-light me-2"
   onclick="history.back()">
   Back
 </button>
+{% endif %}
 
 {% if user.is_authenticated %}
 
