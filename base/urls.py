@@ -5,7 +5,7 @@ from . import views
 
 urlpatterns = [
     # ── Auth (custom views) ───────────────────────────────────────────────
-    path('',TemplateView.as_view(template_name='home.html'),name='home'),
+    path('',TemplateView.as_view(template_name='base/home.html'),name='home'),
     path("login/",   views.login_view,  name="login"),
     path("logout/",  views.logout_view, name="logout"),
 
@@ -43,7 +43,7 @@ urlpatterns = [
 
     # ── Google site verification ──────────────────────────────────────────
     path("google63d0dde2db21043b.html", views.google_verify, name="google_verify"),
-    path('about/',TemplateView.as_view(template_name='about.html'), name='about'),
-    path('privacy/',TemplateView.as_view(template_name='privacy.html'),name='privacy'),
-    path('terms/',TemplateView.as_view(template_name='terms.html'),name='terms'),
+    path('about/',TemplateView.as_view(template_name='base/about.html'), name='about'),
+    path('privacy/',TemplateView.as_view(template_name='base/privacy.html'),name='privacy'),
+    path('terms/',TemplateView.as_view(template_name='base/terms.html'),name='terms'),
     ]
