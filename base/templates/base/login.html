@@ -3,64 +3,119 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign In - Kunji Search</title>
-    <meta name="description" content="Sign in to Kunji Search - AI-powered candidate search tool by Market Scope.">
+    <title>Sign In — Kunji Search by Market Scope</title>
+    <meta name="description" content="Sign in to Kunji Search — AI-powered candidate search tool by Market Scope.">
     <meta name="author" content="Market Scope">
-    <meta name="robots" content="noindex, nofollow">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0%25' stop-color='%23667eea'/><stop offset='100%25' stop-color='%23764ba2'/></linearGradient></defs><rect width='32' height='32' rx='8' fill='url(%23g)'/><text x='16' y='23' font-family='serif' font-size='20' font-weight='bold' text-anchor='middle' fill='white'>K</text></svg>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet">
 
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        :root {
+            --purple-deep: #0e0c1e;
+            --purple-mid: #1a1535;
+            --purple-accent: #667eea;
+            --purple-vivid: #7c6af5;
+            --purple-bright: #a855f7;
+            --purple-soft: #a78bfa;
+            --gold: #e2b96f;
+            --gold-dim: rgba(226,185,111,0.7);
+            --text-primary: #ffffff;
+            --text-muted: rgba(255,255,255,0.45);
+            --text-dim: rgba(255,255,255,0.3);
+            --border: rgba(102,126,234,0.2);
+            --border-gold: rgba(226,185,111,0.25);
+            --red: #fca5a5;
+            --green: #86efac;
         }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
             font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
             background:
-                radial-gradient(ellipse 80% 60% at 20% 10%, rgba(102,126,234,0.35) 0%, transparent 60%),
-                radial-gradient(ellipse 60% 50% at 80% 80%, rgba(118,75,162,0.4) 0%, transparent 55%),
+                radial-gradient(ellipse 80% 60% at 15% 5%, rgba(102,126,234,0.3) 0%, transparent 60%),
+                radial-gradient(ellipse 60% 50% at 85% 85%, rgba(118,75,162,0.38) 0%, transparent 55%),
+                radial-gradient(ellipse 40% 40% at 50% 50%, rgba(124,106,245,0.08) 0%, transparent 70%),
                 linear-gradient(160deg, #0e0c1e 0%, #1a1535 50%, #0e0c1e 100%);
             min-height: 100vh;
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 20px;
+            padding: 24px 20px;
         }
 
+        /* ─── Animated background orbs ─── */
+        body::before, body::after {
+            content: '';
+            position: fixed;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 0;
+            animation: drift 18s ease-in-out infinite alternate;
+        }
+        body::before {
+            width: 500px; height: 500px;
+            top: -150px; left: -150px;
+            background: radial-gradient(circle, rgba(102,126,234,0.12) 0%, transparent 70%);
+        }
+        body::after {
+            width: 400px; height: 400px;
+            bottom: -100px; right: -100px;
+            background: radial-gradient(circle, rgba(168,85,247,0.14) 0%, transparent 70%);
+            animation-delay: -9s;
+        }
+        @keyframes drift {
+            from { transform: translate(0,0) scale(1); }
+            to   { transform: translate(30px, 20px) scale(1.06); }
+        }
+
+        /* ─── Layout ─── */
         .page-wrapper {
+            position: relative;
+            z-index: 1;
             display: flex;
             flex-direction: column;
             align-items: center;
             width: 100%;
-            max-width: 400px;
+            max-width: 440px;
+            gap: 0;
+            animation: fadeUp 0.6s ease both;
+        }
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(18px); }
+            to   { opacity: 1; transform: translateY(0); }
         }
 
-        /* Logo above card */
+        /* ─── Top brand bar ─── */
+        .brand-bar {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
         .page-logo {
             display: flex;
             align-items: center;
             gap: 10px;
-            margin-bottom: 24px;
             text-decoration: none;
         }
-
         .logo-mark {
-            width: 34px;
-            height: 34px;
-            border-radius: 9px;
+            width: 36px; height: 36px;
+            border-radius: 10px;
             background: linear-gradient(135deg, #667eea, #764ba2);
             display: flex;
             align-items: center;
             justify-content: center;
             font-family: 'DM Serif Display', serif;
-            font-size: 17px;
+            font-size: 18px;
             color: white;
             flex-shrink: 0;
+            box-shadow: 0 4px 14px rgba(102,126,234,0.4);
         }
-
         .logo-name {
             font-size: 17px;
             font-weight: 600;
@@ -68,176 +123,359 @@
             letter-spacing: -0.3px;
         }
 
+        .by-marketscope {
+            font-size: 11.5px;
+            font-weight: 500;
+            color: var(--gold-dim);
+            letter-spacing: 0.6px;
+            text-transform: uppercase;
+            text-decoration: none;
+            border: 1px solid var(--border-gold);
+            padding: 4px 10px;
+            border-radius: 20px;
+            background: rgba(226,185,111,0.06);
+            transition: background 0.2s, color 0.2s;
+        }
+        .by-marketscope:hover {
+            background: rgba(226,185,111,0.12);
+            color: var(--gold);
+        }
+
+        /* ─── Main card ─── */
         .login-container {
-            background: rgba(22, 19, 48, 0.85);
-            backdrop-filter: blur(20px);
-            padding: 40px;
-            border-radius: 16px;
-            border: 1px solid rgba(102, 126, 234, 0.2);
-            box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4);
+            background: rgba(22, 19, 48, 0.88);
+            backdrop-filter: blur(24px);
+            border-radius: 18px;
+            border: 1px solid var(--border);
+            box-shadow:
+                0 24px 72px rgba(0,0,0,0.5),
+                0 0 0 1px rgba(255,255,255,0.03) inset;
             width: 100%;
+            overflow: hidden;
+        }
+
+        /* ─── Product identity strip ─── */
+        .product-strip {
+            background: linear-gradient(90deg, rgba(102,126,234,0.15), rgba(168,85,247,0.12));
+            border-bottom: 1px solid var(--border);
+            padding: 16px 32px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+        .product-icon {
+            width: 40px; height: 40px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, rgba(102,126,234,0.3), rgba(168,85,247,0.25));
+            border: 1px solid rgba(102,126,234,0.35);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .product-icon svg {
+            width: 20px; height: 20px;
+            opacity: 0.9;
+        }
+        .product-info h2 {
+            font-size: 13.5px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 2px;
+            letter-spacing: -0.1px;
+        }
+        .product-info p {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-weight: 300;
+            line-height: 1.4;
+        }
+
+        /* ─── Auth notice banner ─── */
+        .auth-notice {
+            margin: 24px 32px 0;
+            background: rgba(226,185,111,0.07);
+            border: 1px solid var(--border-gold);
+            border-radius: 8px;
+            padding: 10px 14px;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+        .auth-notice-icon {
+            flex-shrink: 0;
+            margin-top: 1px;
+            color: var(--gold);
+        }
+        .auth-notice-icon svg { width: 15px; height: 15px; }
+        .auth-notice-text {
+            font-size: 12.5px;
+            color: var(--gold-dim);
+            line-height: 1.5;
+        }
+        .auth-notice-text strong {
+            color: var(--gold);
+            font-weight: 600;
+        }
+
+        /* ─── Form area ─── */
+        .form-area {
+            padding: 24px 32px 28px;
         }
 
         .login-header {
-            text-align: center;
-            margin-bottom: 30px;
+            margin-bottom: 22px;
         }
-
         .login-header h1 {
-            color: #ffffff;
+            color: var(--text-primary);
             font-family: 'DM Serif Display', serif;
-            font-size: 26px;
-            margin-bottom: 8px;
+            font-size: 24px;
+            margin-bottom: 5px;
             letter-spacing: -0.3px;
         }
-
         .login-header p {
-            color: rgba(255, 255, 255, 0.45);
-            font-size: 14px;
+            color: var(--text-muted);
+            font-size: 13.5px;
             font-weight: 300;
         }
 
-        .form-group {
-            margin-bottom: 20px;
-        }
-
+        .form-group { margin-bottom: 18px; }
         .form-group label {
             display: block;
-            margin-bottom: 8px;
-            color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 7px;
+            color: rgba(255,255,255,0.68);
             font-weight: 500;
-            font-size: 13.5px;
+            font-size: 13px;
         }
-
         .form-group input {
             width: 100%;
-            padding: 12px 15px;
-            background: rgba(255, 255, 255, 0.06);
-            border: 1px solid rgba(102, 126, 234, 0.25);
+            padding: 11px 14px;
+            background: rgba(255,255,255,0.055);
+            border: 1px solid rgba(102,126,234,0.22);
             border-radius: 8px;
             font-size: 14px;
             font-family: 'DM Sans', sans-serif;
             color: white;
-            transition: border-color 0.25s, background 0.25s;
+            transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
         }
-
-        .form-group input::placeholder {
-            color: rgba(255, 255, 255, 0.2);
-        }
-
+        .form-group input::placeholder { color: rgba(255,255,255,0.18); }
         .form-group input:focus {
             outline: none;
-            border-color: #667eea;
-            background: rgba(102, 126, 234, 0.08);
+            border-color: var(--purple-accent);
+            background: rgba(102,126,234,0.07);
+            box-shadow: 0 0 0 3px rgba(102,126,234,0.12);
         }
 
         .error-message {
-            background: rgba(239, 68, 68, 0.1);
-            color: #fca5a5;
-            border: 1px solid rgba(239, 68, 68, 0.25);
-            padding: 12px;
+            background: rgba(239,68,68,0.1);
+            color: var(--red);
+            border: 1px solid rgba(239,68,68,0.25);
+            padding: 11px 14px;
             border-radius: 8px;
-            margin-bottom: 20px;
-            font-size: 13.5px;
+            margin-bottom: 18px;
+            font-size: 13px;
+        }
+        .success-message {
+            background: rgba(34,197,94,0.1);
+            color: var(--green);
+            border: 1px solid rgba(34,197,94,0.25);
+            padding: 11px 14px;
+            border-radius: 8px;
+            margin-bottom: 18px;
+            font-size: 13px;
         }
 
-        .success-message {
-            background: rgba(34, 197, 94, 0.1);
-            color: #86efac;
-            border: 1px solid rgba(34, 197, 94, 0.25);
-            padding: 12px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            font-size: 13.5px;
+        .form-row-split {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 22px;
+        }
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .checkbox-group input {
+            width: auto;
+            accent-color: var(--purple-accent);
+        }
+        .checkbox-group label {
+            margin: 0;
+            font-weight: 400;
+            font-size: 13px;
+            color: var(--text-muted);
         }
 
         .btn-login {
             width: 100%;
             padding: 13px;
-            background: linear-gradient(135deg, #7c6af5, #a855f7);
+            background: linear-gradient(135deg, var(--purple-vivid), var(--purple-bright));
             color: white;
             border: none;
-            border-radius: 8px;
-            font-size: 15px;
+            border-radius: 9px;
+            font-size: 14.5px;
             font-weight: 500;
             font-family: 'DM Sans', sans-serif;
             cursor: pointer;
             transition: transform 0.2s, box-shadow 0.2s;
-            box-shadow: 0 0 0 1px rgba(124,106,245,0.4), 0 4px 20px rgba(124,106,245,0.25);
+            box-shadow: 0 0 0 1px rgba(124,106,245,0.4), 0 4px 22px rgba(124,106,245,0.3);
+            letter-spacing: 0.1px;
         }
-
         .btn-login:hover {
             transform: translateY(-2px);
-            box-shadow: 0 0 0 1px rgba(124,106,245,0.6), 0 8px 28px rgba(124,106,245,0.4);
+            box-shadow: 0 0 0 1px rgba(124,106,245,0.6), 0 8px 32px rgba(124,106,245,0.45);
         }
+        .btn-login:active { transform: translateY(0); }
 
-        .btn-login:active {
-            transform: translateY(0);
-        }
-
-        .login-footer {
-            text-align: center;
-            margin-top: 20px;
-            padding-top: 20px;
-            border-top: 1px solid rgba(102, 126, 234, 0.15);
-        }
-
-        .login-footer a {
-            color: #a78bfa;
-            text-decoration: none;
-            font-size: 13.5px;
-        }
-
-        .login-footer a:hover {
-            text-decoration: underline;
-        }
-
-        .checkbox-group {
+        /* ─── Footer inside card ─── */
+        .card-footer {
+            padding: 16px 32px 20px;
+            border-top: 1px solid rgba(102,126,234,0.1);
             display: flex;
             align-items: center;
-            margin-bottom: 20px;
+            justify-content: space-between;
+            gap: 12px;
         }
 
-        .checkbox-group input {
-            width: auto;
-            margin-right: 8px;
-            accent-color: #667eea;
-        }
-
-        .checkbox-group label {
-            margin: 0;
-            font-weight: 400;
-            font-size: 13.5px;
-            color: rgba(255, 255, 255, 0.5);
-        }
-
-        .trust-notice {
-            text-align: center;
-            margin-top: 16px;
+        .contact-pill {
+            display: flex;
+            align-items: center;
+            gap: 6px;
             font-size: 12px;
-            color: rgba(255, 255, 255, 0.35);
-            width: 100%;
+            color: var(--text-muted);
+            text-decoration: none;
+            padding: 5px 10px;
+            border: 1px solid rgba(102,126,234,0.15);
+            border-radius: 20px;
+            background: rgba(102,126,234,0.05);
+            transition: background 0.2s, color 0.2s, border-color 0.2s;
+        }
+        .contact-pill svg { width: 12px; height: 12px; opacity: 0.7; }
+        .contact-pill:hover {
+            background: rgba(102,126,234,0.1);
+            color: var(--purple-soft);
+            border-color: rgba(102,126,234,0.3);
         }
 
-        .trust-notice a {
-            color: rgba(255, 255, 255, 0.55);
-            text-decoration: underline;
+        .footer-links {
+            display: flex;
+            gap: 12px;
         }
+        .footer-links a {
+            font-size: 11.5px;
+            color: rgba(255,255,255,0.35);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+        .footer-links a:hover { color: var(--purple-soft); }
+
+        /* ─── Company ownership strip below card ─── */
+        .company-strip {
+            width: 100%;
+            margin-top: 18px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .ms-badge {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            background: rgba(22,19,48,0.6);
+            border: 1px solid var(--border-gold);
+            border-radius: 30px;
+            padding: 8px 16px;
+            text-decoration: none;
+            transition: background 0.2s;
+        }
+        .ms-badge:hover { background: rgba(226,185,111,0.07); }
+        .ms-dot {
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            background: var(--gold);
+            box-shadow: 0 0 6px rgba(226,185,111,0.5);
+            animation: pulse-dot 2.5s ease-in-out infinite;
+        }
+        @keyframes pulse-dot {
+            0%, 100% { box-shadow: 0 0 4px rgba(226,185,111,0.4); }
+            50%       { box-shadow: 0 0 10px rgba(226,185,111,0.8); }
+        }
+        .ms-badge-text {
+            font-size: 12px;
+            color: var(--gold-dim);
+            font-weight: 500;
+            letter-spacing: 0.2px;
+        }
+        .ms-badge-text strong {
+            color: var(--gold);
+            font-weight: 600;
+        }
+
+        .company-tagline {
+            font-size: 11.5px;
+            color: var(--text-dim);
+            text-align: center;
+            letter-spacing: 0.1px;
+        }
+        .company-tagline a {
+            color: rgba(255,255,255,0.42);
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+        .company-tagline a:hover { color: var(--purple-soft); }
     </style>
 </head>
 <body>
 
-    <div class="page-wrapper">
+<div class="page-wrapper">
 
+    <!-- Top brand bar -->
+    <div class="brand-bar">
         <a href="/" class="page-logo">
             <div class="logo-mark">K</div>
             <span class="logo-name">Kunji Search</span>
         </a>
+        <a href="https://www.marketscope.in" target="_blank" rel="noopener" class="by-marketscope">
+            Market Scope
+        </a>
+    </div>
 
-        <div class="login-container">
+    <div class="login-container">
+
+        <!-- Product identity strip -->
+        <div class="product-strip">
+            <div class="product-icon">
+                <svg fill="none" viewBox="0 0 24 24" stroke="rgba(167,139,250,0.95)" stroke-width="1.6">
+                    <circle cx="11" cy="11" r="7"/>
+                    <path stroke-linecap="round" d="M16.5 16.5l3.5 3.5M8 11h6M11 8v6"/>
+                </svg>
+            </div>
+            <div class="product-info">
+                <h2>Kunji Search (AI Candidate Intelligence)</h2>
+                <p>Market Scope's proprietary AI powered search platform for high-level talent acquisition and executive placement across India and globally.</p>
+            </div>
+        </div>
+
+        <!-- Authorized users only notice -->
+        <div class="auth-notice">
+            <span class="auth-notice-icon">
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                </svg>
+            </span>
+            <p class="auth-notice-text">
+                <strong>Authorized Users Only.</strong> This is a restricted business application. Access is permitted solely to Market Scope employees and authorized personnel. Unauthorized access is prohibited.
+            </p>
+        </div>
+
+        <!-- Form area -->
+        <div class="form-area">
             <div class="login-header">
                 <h1>Welcome back</h1>
-                <p>Sign in to your account to continue</p>
+                <p>Sign in to your Market Scope account to continue</p>
             </div>
 
             {% if messages %}
@@ -285,27 +523,58 @@
                     {% endif %}
                 </div>
 
-                <div class="checkbox-group">
-                    <input type="checkbox" name="remember_me" id="remember_me">
-                    <label for="remember_me">Remember me</label>
+                <div class="form-row-split">
+                    <div class="checkbox-group">
+                        <input type="checkbox" name="remember_me" id="remember_me">
+                        <label for="remember_me">Remember me</label>
+                    </div>
                 </div>
 
                 <input type="hidden" name="next" value="{{ next }}">
 
-                <button type="submit" class="btn-login">Sign In</button>
+                <button type="submit" class="btn-login">Sign In to Kunji Search</button>
             </form>
+        </div>
 
-            <div class="login-footer">
+        <!-- Card footer: contact + legal links -->
+        <div class="card-footer">
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <a href="mailto:contact@marketscope.in" class="contact-pill">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                    </svg>
+                    contact@marketscope.in
+                </a>
+                <a href="https://www.marketscope.in" target="_blank" rel="noopener" class="contact-pill">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path stroke-linecap="round" d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/>
+                    </svg>
+                    marketscope.in
+                </a>
+            </div>
+            <div class="footer-links">
+                <a href="{% url 'terms' %}">Terms</a>
+                <a href="{% url 'privacy' %}">Privacy</a>
             </div>
         </div>
 
-        <div class="trust-notice">
-            By signing in you agree to Market Scope's
-            <a href="{% url 'terms' %}">Terms</a> &amp;
-            <a href="{% url 'privacy' %}">Privacy Policy</a>
-        </div>
-
     </div>
+
+    <!-- Company ownership / trust strip -->
+    <div class="company-strip">
+        <a href="https://www.marketscope.in" target="_blank" rel="noopener" class="ms-badge">
+            <span class="ms-dot"></span>
+            <span class="ms-badge-text">A <strong>Market Scope</strong> product &mdash; Connecting People &amp; Possibilities for 35+ Years</span>
+        </a>
+        <p class="company-tagline">
+            New Delhi 110016 &nbsp;|&nbsp;
+            <a href="https://www.marketscope.in/terms-and-conditions" target="_blank">Terms</a> &amp;
+            <a href="https://www.marketscope.in/privacy-policy" target="_blank">Privacy Policy</a>
+        </p>
+    </div>
+
+</div>
 
 </body>
 </html>
